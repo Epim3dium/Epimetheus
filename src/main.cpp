@@ -8,5 +8,7 @@
 int main() {
     vk::Image img;
     glm::vec2 v;
+    glm::mat4x4 mat;
+    mat.length();
     return 0;
 }
