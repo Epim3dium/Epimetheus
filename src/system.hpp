@@ -8,19 +8,20 @@
 #include "memory/allocator.hpp"
 
 namespace epi {
-template<class Tuple, size_t N>
-struct advance_pointers_in_tuple {
+
+template<class T, class ...Types>
+struct advance_pointers {
 public:
-    advance_pointers_in_tuple(Tuple& t) {
-        std::get<N>(t) += 1;
-        advance_pointers_in_tuple<Tuple, N - 1>(std::ref(t));
+    advance_pointers(void** t) {
+        (advance_pointers<T>(t));
+        (advance_pointers<Types...>(&t[1]));
     }
 };
 template<class T>
-struct advance_pointers_in_tuple<T, 0> {
+struct advance_pointers<T> {
 public:
-    advance_pointers_in_tuple(T& t) {
-        std::get<0>(t) += 1;
+    advance_pointers(void** t) {
+        ((char*&)t[0]) += sizeof(T);
     }
 };
 
@@ -142,34 +143,44 @@ public:
         return m_buffers[itr->second].get<T>(index);
     }
 
+    template<class ...T>
+    inline void updatePointers(void** t) {
+        (advance_pointers<T...>(t));
+    }
+    template<class T>
+    T& expand(void**& t) {
+        auto ptr = t[0];
+        t = &t[1];
+        return *(T*)ptr;
+    }
     template<class Func>
     void update(Func&& f) {
-        update(std::function(std::forward<Func>(f)));
-    }
-    template<class ...T>
-    inline void updateTuple(std::tuple<T...> t) {
-        advance_pointers_in_tuple<decltype(t), sizeof...(T) - 1>(std::ref(t));
+        update((std::forward<Func>(f)));
     }
     template<class ...Types>
-    void update(std::function<void(Types&...)> update_func) {
+    void update(void (*update_func)(Types&...)) {
         //then get tuple
-        std::tuple<Types*...> list_of_pointers;
-        setTuple<decltype(list_of_pointers), Types...>(0, 0, m_buffers.data(), list_of_pointers);
+        size_t type_count = sizeof...(Types);
+        void* pointers[type_count];
+        //std::tuple<Types*...> list_of_pointers;
+        setPointers<Types...>(0, 0, m_buffers.data(), pointers);
         for(size_t i = 0; i < m_instances; i++) {
-            updateTuple(list_of_pointers);
-            update_func(*std::get<Types*>(list_of_pointers)...);
+            auto tmp = pointers;
+            update_func((expand<Types>(tmp))...);
+
+            updatePointers<Types...>(pointers);
         }
     }
-    template<class TupleType, class T>
-    void setTuple(size_t idx, size_t buffer_idx, Buffer* buf_array, TupleType& data) {
-        T* var = &buf_array[buffer_idx++].get<T>(idx);
-        std::get<T*>(data) = var;
+    template<class T>
+    size_t setPointers(size_t idx, size_t buffer_idx, Buffer* buf_array, void** data) {
+        T* var = &buf_array[buffer_idx].get<T>(idx);
+        data[buffer_idx] = (void*)var;
+        return buffer_idx + 1;
     }
-    template<class TupleType, class T, class Tnext, class ...Trest>
-    void setTuple(size_t idx, size_t buffer_idx, Buffer* buf_array, TupleType& data) {
-        T* var = &buf_array[buffer_idx++].get<T>(idx);
-        std::get<T*>(data) = var;
-        setTuple<TupleType, Tnext, Trest...>(idx, buffer_idx, buf_array, data);
+    template<class T, class Tnext, class ...Trest>
+    void setPointers(size_t idx, size_t buffer_idx, Buffer* buf_array, void** data) {
+        buffer_idx = setPointers<T>(idx, buffer_idx, buf_array, data);
+        setPointers<Tnext, Trest...>(idx, buffer_idx, buf_array, data);
     }
 
     System(const System&) = delete;
