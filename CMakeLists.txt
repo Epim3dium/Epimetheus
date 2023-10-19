@@ -12,5 +12,8 @@ add_subdirectory(src)
 if(POLICY CMP0079 )
   cmake_policy(SET CMP0079 NEW)
 endif()
+set(CMAKE_CXX_FLAGS_DEBUG "-O3")
+set(CMAKE_C_FLAGS_DEBUG "-O3")
+
 include(./cmake/Install.cmake)
 include(./cmake/FindGLM.cmake)

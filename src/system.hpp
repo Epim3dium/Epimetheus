@@ -1,23 +1,28 @@
 #ifndef EPI_SYSTEM_HPP
 #define EPI_SYSTEM_HPP
 
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 #include <functional>
 #include "memory/allocator.hpp"
 
 namespace epi {
-template <class... Ts, std::size_t... Is, class Tuple>
-decltype( auto ) tie_from_specified_expand( std::index_sequence<Is...>, Tuple& tuple )
-{
-    return std::tuple<Ts...>{ *std::get<Is>( tuple )... };
-}
-
-template <class... Ts, class Tuple>
-decltype( auto ) tie_from_expand( Tuple& tuple )
-{
-    return tie_from_specified_expand<Ts...>( std::make_index_sequence<sizeof...( Ts )>{}, tuple );
-}
+template<class Tuple, size_t N>
+struct advance_pointers_in_tuple {
+public:
+    advance_pointers_in_tuple(Tuple& t) {
+        std::get<N>(t) += 1;
+        advance_pointers_in_tuple<Tuple, N - 1>(std::ref(t));
+    }
+};
+template<class T>
+struct advance_pointers_in_tuple<T, 0> {
+public:
+    advance_pointers_in_tuple(T& t) {
+        std::get<0>(t) += 1;
+    }
+};
 
 class Buffer {
     void* mem_block;
@@ -25,7 +30,7 @@ class Buffer {
     void* tail;
 
     const size_t m_elem_size;
-    size_t m_max_elem_count;
+    const size_t m_max_elem_count;
     size_t m_elem_count = 0U;
 
     size_t m_type_hash;
@@ -56,6 +61,10 @@ class Buffer {
         std::memcpy(tail, ptr, m_elem_size);
     }
 public:
+    void clear() {
+        tail = mem_block;
+        m_elem_count = 0;
+    }
     template<class T>
     void push_back(T val) {
         assert(typeid(T).hash_code() == m_type_hash);
@@ -71,7 +80,10 @@ public:
     template<class T>
     T& get(size_t index) {
         assert(typeid(T).hash_code() == m_type_hash);
-        assert(index < m_elem_count && "tried accessing element out of range");
+        if(!(index < m_elem_count && "tried accessing element out of range")) {
+            std::cerr << index << "\t" << m_elem_count << "\n";
+            assert(false);
+        }
         return static_cast<T*>(mem_block)[index];
     }
     Buffer(const std::type_info& type_hash, size_t elem_size, size_t elem_count) : m_type_hash(type_hash.hash_code()), m_elem_size(elem_size), m_max_elem_count(elem_count)
@@ -84,7 +96,7 @@ public:
 
 namespace epi {
 
-#define EPI_MAX_ELEMENT_COUNT 1024
+#define EPI_MAX_ELEMENT_COUNT 16384
 class SystemFactory;
 class System {
     typedef size_t hash_type;
@@ -118,6 +130,11 @@ public:
         m_instances++;
         m_push_back(0, v, vals...);
     }
+    void clear() {
+        m_instances = 0;
+        for(auto& b : m_buffers)
+            b.clear();
+    }
     template<class T>
     T& get(size_t index) {
         auto itr = m_index_list.find(typeid(T).hash_code());
@@ -129,25 +146,30 @@ public:
     void update(Func&& f) {
         update(std::function(std::forward<Func>(f)));
     }
+    template<class ...T>
+    inline void updateTuple(std::tuple<T...> t) {
+        advance_pointers_in_tuple<decltype(t), sizeof...(T) - 1>(std::ref(t));
+    }
     template<class ...Types>
     void update(std::function<void(Types&...)> update_func) {
         //then get tuple
         std::tuple<Types*...> list_of_pointers;
-         for(size_t i = 0; i < m_instances; i++) {
-             updateTuple<decltype(list_of_pointers), Types...>(i, 0, m_buffers.data(), list_of_pointers);
-             update_func(*std::get<Types*>(list_of_pointers)...);
-         }
+        setTuple<decltype(list_of_pointers), Types...>(0, 0, m_buffers.data(), list_of_pointers);
+        for(size_t i = 0; i < m_instances; i++) {
+            updateTuple(list_of_pointers);
+            update_func(*std::get<Types*>(list_of_pointers)...);
+        }
     }
     template<class TupleType, class T>
-    void updateTuple(size_t idx, size_t buffer_idx, Buffer* buf_array, TupleType& data, T next = {}) {
+    void setTuple(size_t idx, size_t buffer_idx, Buffer* buf_array, TupleType& data) {
         T* var = &buf_array[buffer_idx++].get<T>(idx);
         std::get<T*>(data) = var;
     }
     template<class TupleType, class T, class Tnext, class ...Trest>
-    void updateTuple(size_t idx, size_t buffer_idx, Buffer* buf_array, TupleType& data, T next = {}) {
+    void setTuple(size_t idx, size_t buffer_idx, Buffer* buf_array, TupleType& data) {
         T* var = &buf_array[buffer_idx++].get<T>(idx);
         std::get<T*>(data) = var;
-        updateTuple<TupleType, Tnext, Trest...>(idx, buffer_idx, buf_array, data);
+        setTuple<TupleType, Tnext, Trest...>(idx, buffer_idx, buf_array, data);
     }
 
     System(const System&) = delete;
@@ -161,11 +183,11 @@ class SystemFactory {
     std::vector<System::HashSize> m_init_values;
 
     template<class T>
-    void eval(T t = {}) {
+    void eval() {
         m_init_values.push_back({typeid(T), sizeof(T)});
     }
     template<class T, class Next, class ...R>
-    void eval(T t = {}) {
+    void eval() {
         m_init_values.push_back({typeid(T), sizeof(T)});
         eval<Next, R...>();
     }

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -7,6 +8,8 @@
 #include <glm/mat4x4.hpp>
 
 #include "system.hpp"
+#include "timer.h"
+#include "RNG.h"
 
 
 using namespace epi;
@@ -28,38 +31,58 @@ using namespace epi;
 //     return {};
 // }
 
-void update_func(const float& f, int& i , char& c) {
-    std::cout << f << i << c << std::endl;
+float global = 0.f;
+void update_func(float& f, int& i , char& c) {
+    global += i / (int)c;
+    global *= f;
 }
-int main() {
+
+int main(int argc, char **argv) {
+    std::cin.get();
+    RNG rng;
     SystemFactory fac;
-    fac.add<float>();
-    fac.add<int>();
-    fac.add<char>();
+    fac.add<float, int, char>();
     auto sys = fac.create();
-    sys->push_back(21.f, 3, '7');
-    sys->push_back(4.f, 2, '0');
 
-    // std::tuple<float*, int*, char*> t;
-    // sys->  updateTuple<decltype(t), float, int, char>(0, 0, sys->m_buffers.data(), t);
-    // *std::get<int*>(t) = 1000.;
-    //
-    // std::cout << sys->get<float>(0);
-    // std::cout << sys->get<int>(0);
-    // std::cout << sys->get<char>(0);
+    std::vector<float> vecf;
+    std::vector<int> veci;
+    std::vector<char> vecc;
+    auto initSys = [&](int count) {
+        sys->clear();
+        for(int i = 0; i < count; i++)
+            sys->push_back(rng.Random(0.f, 1.f), rng.Random(0, 1000), rng.Random('a', 'z'));
+    };
+    auto initVec = [&](int count) {
+        vecf.clear();
+        veci.clear();
+        vecc.clear();
+        for(int i = 0; i < count; i++) {
+            vecf.push_back(rng.Random(0.f, 1.f));
+            veci.push_back(rng.Random(0, 1000));
+            vecc.push_back(rng.Random('a', 'z'));
+        }
+    };
+    int iters = 10, elems = 10000 ;
 
-    sys->update(&update_func);
-
-    // int x{ 2 };
-    // int y{ 3 };
-    // int z{ 4 };
-    // std::tuple<int*, int*, int*> g19( &x, &y, &z );
-    //
-    // auto t0{ tie_from_expand<int&, int&, int&>( g19 ) };
-    // std::cout << std::get<0>(t0);
-    // std::cout << std::get<1>(t0);
-    // std::cout << std::get<2>(t0);
-
-    
+    for(int i = 0; i < iters; i++) {
+        initVec(elems);
+        initSys(elems);
+        {
+             timer::scope timer("sys");
+             for(size_t idx = 0; idx < elems; idx++) {
+                 sys->update(update_func);
+             }
+        }
+        {
+            timer::scope time("v");
+            for(size_t idx = 0; idx < elems; idx++) {
+                update_func(vecf[idx], veci[idx], vecc[idx]);
+            }
+        }
+        std::cout << "system: " << timer::Get("sys") << "\tvectors: " << timer::Get("v") << "\n";
+        timer::Get("sys").reset();
+        timer::Get("v").reset();
+        std::cout << global << "\n";
+    }
     return 0;
 }
