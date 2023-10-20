@@ -8,23 +8,6 @@
 #include "memory/allocator.hpp"
 
 namespace epi {
-
-template<class T, class ...Types>
-struct advance_pointers {
-public:
-    advance_pointers(void** t) {
-        (advance_pointers<T>(t));
-        (advance_pointers<Types...>(&t[1]));
-    }
-};
-template<class T>
-struct advance_pointers<T> {
-public:
-    advance_pointers(void** t) {
-        ((char*&)t[0]) += sizeof(T);
-    }
-};
-
 class Buffer {
     void* mem_block;
     //points to last free element
@@ -62,6 +45,9 @@ class Buffer {
         std::memcpy(tail, ptr, m_elem_size);
     }
 public:
+    inline void* getData() const {
+        return mem_block;
+    }
     void clear() {
         tail = mem_block;
         m_elem_count = 0;
@@ -93,11 +79,8 @@ public:
         tail = mem_block;
     }
 };
-};
 
-namespace epi {
-
-#define EPI_MAX_ELEMENT_COUNT 16384
+#define EPI_MAX_ELEMENT_COUNT 100000000
 class SystemFactory;
 class System {
     typedef size_t hash_type;
@@ -123,6 +106,24 @@ class System {
         m_buffers[buf_index++].push_back(v);
         m_push_back(buf_index, vals...);
     }
+
+    template<class T>
+    struct Deref {
+        typedef typename std::remove_reference<decltype(*std::declval<T>().p)>::type Type;
+    };
+    template<class T>
+    void m_getBufferPtrs(void** ptr, size_t idx) {
+        auto itr = m_index_list.find(typeid(T).hash_code());
+        assert(itr != m_index_list.end());
+        ptr[idx++] = m_buffers[itr->second].getData();
+    }
+    template<class T, class Next, class ...Types>
+    void m_getBufferPtrs(void** ptr, size_t idx = 0) {
+        auto itr = m_index_list.find(typeid(T).hash_code());
+        assert(itr != m_index_list.end());
+        ptr[idx++] = m_buffers[itr->second].getData();
+        m_getBufferPtrs<Next, Types...>(ptr, idx++);
+    }
 public:
     std::vector<Buffer> m_buffers;
     template<class T, class ...Rest>
@@ -143,44 +144,20 @@ public:
         return m_buffers[itr->second].get<T>(index);
     }
 
-    template<class ...T>
-    inline void updatePointers(void** t) {
-        (advance_pointers<T...>(t));
-    }
-    template<class T>
-    T& expand(void**& t) {
-        auto ptr = t[0];
-        t = &t[1];
-        return *(T*)ptr;
-    }
     template<class Func>
     void update(Func&& f) {
         update((std::forward<Func>(f)));
     }
     template<class ...Types>
-    void update(void (*update_func)(Types&...)) {
-        //then get tuple
+    void update(void (*update_func)(Types...)) {
         size_t type_count = sizeof...(Types);
         void* pointers[type_count];
-        //std::tuple<Types*...> list_of_pointers;
-        setPointers<Types...>(0, 0, m_buffers.data(), pointers);
+        m_getBufferPtrs<Types...>(pointers);
+        size_t idx = 0;
         for(size_t i = 0; i < m_instances; i++) {
-            auto tmp = pointers;
-            update_func((expand<Types>(tmp))...);
-
-            updatePointers<Types...>(pointers);
+            update_func((( reinterpret_cast<typename std::remove_reference<Types>::type*>(pointers[idx++]))[i] )...);
+            idx = 0;
         }
-    }
-    template<class T>
-    size_t setPointers(size_t idx, size_t buffer_idx, Buffer* buf_array, void** data) {
-        T* var = &buf_array[buffer_idx].get<T>(idx);
-        data[buffer_idx] = (void*)var;
-        return buffer_idx + 1;
-    }
-    template<class T, class Tnext, class ...Trest>
-    void setPointers(size_t idx, size_t buffer_idx, Buffer* buf_array, void** data) {
-        buffer_idx = setPointers<T>(idx, buffer_idx, buf_array, data);
-        setPointers<Tnext, Trest...>(idx, buffer_idx, buf_array, data);
     }
 
     System(const System&) = delete;
