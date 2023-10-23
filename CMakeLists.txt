@@ -14,6 +14,5 @@ if(POLICY CMP0079 )
 endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-O0")
 set(CMAKE_C_FLAGS_DEBUG "-O0")
+include(cmake/Install.cmake)
 
-include(./cmake/Install.cmake)
-include(./cmake/FindGLM.cmake)

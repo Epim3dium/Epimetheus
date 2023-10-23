@@ -1,9 +1,11 @@
-find_package(glfw3 REQUIRED FATAL_ERROR) # error
-find_package(Vulkan REQUIRED FATAL_ERROR) # error
+find_package(GLM REQUIRED)
+find_package(SFML 2.6 COMPONENTS graphics audio REQUIRED)
 
 target_include_directories (epimetheus
-    PUBLIC ${GLFW_INCLUDE_DIRS}
-    PUBLIC ${Vulkan_INCLUDE_DIRS}
+    PUBLIC ${GLM_INCLUDE_DIR}
+    PUBLIC ${SFML_INCLUDE_DIR}
 )
-target_link_libraries (epimetheus glfw)
-target_link_libraries (epimetheus ${VULKAN_LIB_LIST})
+target_link_libraries (epimetheus 
+    ${GLM_LIB_LIST}
+    sfml-graphics sfml-audio
+)
