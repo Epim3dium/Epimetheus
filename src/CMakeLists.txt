@@ -6,6 +6,8 @@ set(SOURCE_FILES
 set(HEADER_FILES
     memory/pool_allocator.hpp
     memory/allocator.hpp
+    debug/log.hpp
+    debug/debug.hpp
     utils/set.hpp
     utils/stack_linked_list.hpp
 )

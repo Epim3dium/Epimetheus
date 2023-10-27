@@ -1,11 +1,9 @@
 #include <iostream>
 #include <thread>
 #include <SFML/Graphics.hpp>
-#include <glm/vec2.hpp>
 
 #include "system.hpp"
 #include "timer.h"
-#include "RNG.h"
 
 
 using namespace epi;
