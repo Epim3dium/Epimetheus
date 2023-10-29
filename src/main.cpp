@@ -11,14 +11,25 @@ using namespace epi;
 void f(float x, float xx) {
     std::cout << x << "\t" << xx << "\n";
 }
+enum class eVelocity {
+    velx,
+    vely,
+    velz,
+};
 int main()
 {
-    SystemFactory fac;
-    fac.add<float, float>();
+    System<eVelocity>::Factory fac;
+
+    fac.add<float>(eVelocity::velx);
+    fac.add<float>(eVelocity::vely);
+
     auto sys = fac.create();
     sys->push_back(21.f, 37.f);
     sys->push_back(6.f, 9.f);
-    sys->update([](float x, float xx) {
+
+    sys->update(
+            {eVelocity::velx, eVelocity::vely}, 
+            [](float x, float xx) {
     std::cout << x << "\t" << xx << "\n";
     });
     // create the window
