@@ -88,11 +88,13 @@ class System {
         const std::type_info& hash;
         size_t size;
     };
-    std::unordered_map<hash_type, size_t> m_index_list;
+    std::unordered_multimap<hash_type, size_t> m_index_list;
+    std::vector<Buffer> m_buffers;
+    std::vector<bool> m_occupied_buffers;
     size_t m_var_count;
     size_t m_instances;
 
-    System(std::vector<HashSize> types_stored) : m_var_count(types_stored.size()) {
+    System(std::vector<HashSize> types_stored) : m_var_count(types_stored.size()), m_occupied_buffers(types_stored.size(), false) {
         size_t idx = 0;
         for(auto [hash, size] : types_stored) {
             m_index_list.insert({hash.hash_code(), idx++});
@@ -107,25 +109,30 @@ class System {
         m_push_back(buf_index, vals...);
     }
 
+    size_t m_getBufferIdxOfType(const std::type_info& info) {
+        auto [begin, end] = m_index_list.equal_range(info.hash_code());
+        while(begin != end && m_occupied_buffers[begin->second] == true) {
+            begin++;
+        }
+        assert(begin != end);
+        return begin->second;
+    }
     template<class T>
-    struct Deref {
-        typedef typename std::remove_reference<decltype(*std::declval<T>().p)>::type Type;
-    };
-    template<class T>
-    void m_getBufferPtrs(void** ptr, size_t idx) {
-        auto itr = m_index_list.find(typeid(T).hash_code());
-        assert(itr != m_index_list.end());
-        ptr[idx++] = m_buffers[itr->second].getData();
+    void m_getBufferPtrs(void** ptr, size_t idx = 0) {
+        auto buffer_idx = m_getBufferIdxOfType(typeid(T));
+        ptr[idx] = m_buffers[buffer_idx].getData();
     }
     template<class T, class Next, class ...Types>
     void m_getBufferPtrs(void** ptr, size_t idx = 0) {
-        auto itr = m_index_list.find(typeid(T).hash_code());
-        assert(itr != m_index_list.end());
-        ptr[idx++] = m_buffers[itr->second].getData();
-        m_getBufferPtrs<Next, Types...>(ptr, idx++);
+
+        auto buffer_idx = m_getBufferIdxOfType(typeid(T));
+        ptr[idx] = m_buffers[buffer_idx].getData();
+
+        m_occupied_buffers[buffer_idx] = true;
+        m_getBufferPtrs<Next, Types...>(ptr, idx + 1);
+        m_occupied_buffers[buffer_idx] = false;
     }
 public:
-    std::vector<Buffer> m_buffers;
     template<class T, class ...Rest>
     void push_back(T v, Rest ... vals) {
         assert(sizeof...(vals) + 1 == m_var_count && "tried to push uncomplete variable set");

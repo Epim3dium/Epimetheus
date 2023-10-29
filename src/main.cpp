@@ -8,8 +8,17 @@
 
 using namespace epi;
 
+void f(float x, float xx) {
+    std::cout << x << "\t" << xx << "\n";
+}
 int main()
 {
+    SystemFactory fac;
+    fac.add<float, float>();
+    auto sys = fac.create();
+    sys->push_back(21.f, 37.f);
+    sys->push_back(6.f, 9.f);
+    sys->update(f);
     // create the window
     sf::RenderWindow window(sf::VideoMode(800, 600), "My window");
 
