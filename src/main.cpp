@@ -18,7 +18,9 @@ int main()
     auto sys = fac.create();
     sys->push_back(21.f, 37.f);
     sys->push_back(6.f, 9.f);
-    sys->update(f);
+    sys->update([](float x, float xx) {
+    std::cout << x << "\t" << xx << "\n";
+    });
     // create the window
     sf::RenderWindow window(sf::VideoMode(800, 600), "My window");
 

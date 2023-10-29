@@ -132,6 +132,17 @@ class System {
         m_getBufferPtrs<Next, Types...>(ptr, idx + 1);
         m_occupied_buffers[buffer_idx] = false;
     }
+    template<class ...Types>
+    void m_update(std::function<void(Types...)> update_func) {
+        size_t type_count = sizeof...(Types);
+        void* pointers[type_count];
+        m_getBufferPtrs<Types...>(pointers);
+        size_t idx = 0;
+        for(size_t i = 0; i < m_instances; i++) {
+            update_func((( reinterpret_cast<typename std::remove_reference<Types>::type*>(pointers[idx++]))[i] )...);
+            idx = 0;
+        }
+    }
 public:
     template<class T, class ...Rest>
     void push_back(T v, Rest ... vals) {
@@ -153,18 +164,7 @@ public:
 
     template<class Func>
     void update(Func&& f) {
-        update((std::forward<Func>(f)));
-    }
-    template<class ...Types>
-    void update(void (*update_func)(Types...)) {
-        size_t type_count = sizeof...(Types);
-        void* pointers[type_count];
-        m_getBufferPtrs<Types...>(pointers);
-        size_t idx = 0;
-        for(size_t i = 0; i < m_instances; i++) {
-            update_func((( reinterpret_cast<typename std::remove_reference<Types>::type*>(pointers[idx++]))[i] )...);
-            idx = 0;
-        }
+        m_update(std::function(std::forward<Func>(f)));
     }
 
     System(const System&) = delete;
