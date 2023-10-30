@@ -6,6 +6,11 @@ set(SOURCE_FILES
 set(HEADER_FILES
     memory/pool_allocator.hpp
     memory/allocator.hpp
+    core/buffer.hpp
+    core/group.hpp
+    multithreading/thread_pool.hpp
+    core/component_group.hpp
+    core/entity.hpp
     debug/log.hpp
     debug/debug.hpp
     utils/set.hpp
