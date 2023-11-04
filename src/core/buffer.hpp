@@ -40,12 +40,9 @@ class Buffer {
             m_elem_count--;
             tail = last;
         }
-        std::memcpy(tail, ptr, m_elem_size);
+        std::memcpy(ptr, tail, m_elem_size);
     }
 public:
-    inline void* getDataPointer() const {
-        return mem_block;
-    }
     template<class T>
     inline std::span<T> getData() const {
         assert(typeid(T).hash_code() == m_type_hash);
@@ -62,10 +59,24 @@ public:
         auto mem = allocate(sizeof(T));
         new (mem)T(val);
     }
-    void erase(size_t index) {
-        assert(index < m_elem_count);
-        auto ptr =(char*)mem_block;
-        swapAndFree(ptr + index * m_elem_size);
+    void swap(size_t idx1, size_t idx2) {
+        auto head =(char*)mem_block;
+        auto ptr1 = (head + idx1 * m_elem_size);
+        auto ptr2 = (head + idx2 * m_elem_size);
+
+        for (size_t i = 0; i < m_elem_size; i++) {
+            char tmp = ptr1[i];
+            ptr1[i] = ptr2[i];
+            ptr2[i] = tmp;
+        }
+
+    }
+    void pop_back() {
+        assert(tail != mem_block);
+        char* last = static_cast<char*>(tail);
+        last -= m_elem_size;
+        m_elem_count--;
+        tail = last;
     }
     template<class T>
     T& get(size_t index) {

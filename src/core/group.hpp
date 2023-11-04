@@ -17,22 +17,24 @@ using base_type = typename std::remove_cv<typename std::remove_reference<T>::typ
 
 template<class Enum>
 class Group {
+    std::unordered_map<Enum, size_t> m_buffer_index_list;
+    std::vector<Buffer> m_buffers;
+protected:
     struct HashSize {
         const std::type_info& hash;
         size_t size;
     };
-    std::unordered_map<Enum, size_t> m_index_list;
-    std::vector<Buffer> m_buffers;
     size_t m_var_count;
     size_t m_instances;
 
     Group(std::span<HashSize> types_stored, std::span<Enum> variables) : m_var_count(types_stored.size()) {
         size_t idx = 0;
         for(auto [hash, size] : types_stored) {
-            m_index_list.insert({variables[idx], idx++});
+            m_buffer_index_list.insert({variables[idx], idx++});
             m_buffers.push_back(Buffer(hash, size, EPI_GROUP_MAX_ELEMENT_COUNT));
         }
     }
+private:
 
     void m_push_back(size_t buf_index) {}
     template<class T, class ...Rest>
@@ -42,37 +44,12 @@ class Group {
     }
 
     size_t m_getBufferIdxOfType(Enum info) {
-        auto itr = m_index_list.find(info);
-        assert(itr != m_index_list.end());
+        auto itr = m_buffer_index_list.find(info);
+        assert(itr != m_buffer_index_list.end());
         return itr->second;
     }
-
-
-    template<class T>
-    void m_getBufferPtrs(void** ptr, std::span<Enum> identifiers, size_t idx = 0) {
-        auto buffer_idx = m_getBufferIdxOfType(identifiers[idx]);
-        ptr[idx] = m_buffers[buffer_idx]. getDataPointer();
-    }
-    template<class T, class Next, class ...Types>
-    void m_getBufferPtrs(void** ptr, std::span<Enum> identifiers, size_t idx = 0) {
-
-        auto buffer_idx = m_getBufferIdxOfType(identifiers[idx]);
-        ptr[idx] = m_buffers[buffer_idx].getDataPointer();
-
-        m_getBufferPtrs<Next, Types...>(ptr, identifiers, idx + 1);
-    }
-    template<class ...Types>
-    void m_update(std::span<Enum> identifiers, std::function<void(Types...)> update_func) {
-        size_t type_count = sizeof...(Types);
-        void* pointers[type_count];
-        m_getBufferPtrs<Types...>(pointers, identifiers);
-        size_t idx = 0;
-        for(size_t i = 0; i < m_instances; i++) {
-            update_func((( reinterpret_cast<base_type<Types>*>(pointers[idx++]))[i] )...);
-            idx = 0;
-        }
-    }
 public:
+    typedef std::unique_ptr<Group> pointer;
     size_t size() const {
         return m_instances;
     }
@@ -82,6 +59,24 @@ public:
         m_instances++;
         m_push_back(0, v, vals...);
     }
+    void swap(size_t idx1, size_t idx2) {
+        for(auto& b : m_buffers) {
+            b.swap(idx1, idx2);
+        }
+    }
+    void erase(size_t index) {
+        for(auto& b : m_buffers) {
+            b.swap(index, size() - 1);
+            b.pop_back();
+        }
+        m_instances--;
+    }
+    void pop_back(size_t index) {
+        for(auto& b : m_buffers) {
+            b.pop_back();
+        }
+        m_instances--;
+    }
     void clear() {
         m_instances = 0;
         for(auto& b : m_buffers)
@@ -89,16 +84,14 @@ public:
     }
     template<class T>
     T& get(Enum variable, size_t index) {
-        auto itr = m_index_list.find(variable);
-        assert(itr != m_index_list.end());
+        auto itr = m_buffer_index_list.find(variable);
+        assert(itr != m_buffer_index_list.end());
         return m_buffers[itr->second].
             template get<T>(index);
     }
 
     template<class Func>
-    void update(std::vector<Enum> identifiers, Func&& f) {
-        m_update(identifiers, std::function(std::forward<Func>(f)));
-    }
+    void update(std::vector<Enum> identifiers, Func f);
 
 
     Group(const Group&) = delete;
@@ -106,40 +99,55 @@ public:
     Group& operator=(const Group&) = delete;
     Group& operator=(Group&&) = delete;
 
-    struct VariableGetter {
-        Group<Enum>* group;
-        std::vector<Enum> identifiers;
-        std::vector<void*> getPointers() {
-
-            std::vector<void*> ptrs;
-            for(int i = 0; i < identifiers.size(); i++) {
-                auto id = identifiers[i];
-                auto buf_index = group->m_getBufferIdxOfType(id);
-                ptrs.push_back(group->m_buffers[buf_index].getDataPointer());
-            }
-            return ptrs;
+    std::vector<Buffer*> getBuffers(std::vector<Enum> identifiers) {
+        std::vector<Buffer*> ptrs;
+        for(int i = 0; i < identifiers.size(); i++) {
+            auto id = identifiers[i];
+            auto buf_index = m_getBufferIdxOfType(id);
+            ptrs.push_back(&m_buffers[buf_index]);
         }
-    };
+        return ptrs;
+    }
     class Factory;
 };
-    template<class ...Types>
-    void updateMatchingHelper(std::function<void(Types...)> update_func, std::vector<void*> pointers, size_t iters) {
+
+namespace helper {
+    template<class T>
+    static inline std::vector<T> merge2DVectorsIntoOne(std::vector<std::vector<T>>&& vecs) {
+        std::vector<T> result;
+        result.reserve(16U);
+        for(auto& v : vecs) {
+            result.insert(result.end(), v.begin(), v.end());
+        }
+        return result;
+    }
+    template<class ...EnumTypes, class ...Types>
+    static inline void updateAny(std::function<void(Types...)> update_func,Group<EnumTypes>*... groups,
+            std::vector<EnumTypes>... variables) 
+    {
+        std::vector<std::vector<Buffer*>> buffers_2d = {groups->getBuffers(variables)... };
+        std::vector<Buffer*> buffers = merge2DVectorsIntoOne(std::move(buffers_2d));
+
         size_t idx = 0;
+        void* pointers[] = {(buffers[idx++]->getData<base_type<Types>>().data())...};
+        size_t iters = std::min({groups->size()...});
+        idx = 0;
         for(size_t i = 0; i < iters; i++) {
-            update_func((( reinterpret_cast<base_type<Types>*>(pointers[idx++]))[i] )...);
+            update_func({( reinterpret_cast<base_type<Types>*>(pointers[idx++]))[i] }...);
             idx = 0;
         }
     }
-    template<class ...EnumTypes, class Func>
-    void updateMatching(Func f, typename Group<EnumTypes>::VariableGetter... getters) {
-        std::vector<std::vector<void*>> pointers2d = {getters.getPointers()...};
-        size_t iters = std::min({getters.group->size()...});
-        std::vector<void*> pointers;
-        for(auto& v : pointers2d) {
-            pointers.insert(pointers.end(), v.begin(), v.end());
-        }
-        updateMatchingHelper(std::function(std::forward<Func>(f)), pointers, iters);
-    }
+}
+template<class ...EnumTypes, class Func>
+void updateAny(std::vector<EnumTypes>... identifiers, Func f, Group<EnumTypes>*... groups) {
+    helper::updateAny<EnumTypes...>(std::function(std::forward<Func>(f)), groups..., identifiers...);
+}
+
+template<class Enum>
+template<class Func>
+void Group<Enum>::update(std::vector<Enum> identifiers, Func f) {
+    updateAny<Enum>(identifiers, f, this);
+}
 
 template<class Enum>
 class Group<Enum>::Factory {
