@@ -10,7 +10,7 @@
 #include "buffer.hpp"
 
 namespace epi {
-#define EPI_GROUP_MAX_ELEMENT_COUNT 100000
+#define EPI_GROUP_MAX_ELEMENT_COUNT 10000000
 
 template<typename T>
 using base_type = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
@@ -91,7 +91,7 @@ public:
     }
 
     template<class Func>
-    void update(std::vector<Enum> identifiers, Func f);
+    void update(std::vector<Enum> identifiers, Func&& f);
 
 
     Group(const Group&) = delete;
@@ -122,7 +122,7 @@ namespace helper {
         return result;
     }
     template<class ...EnumTypes, class ...Types>
-    static inline void updateAny(std::function<void(Types...)> update_func,Group<EnumTypes>*... groups,
+    static inline void updateAny(std::function<void(Types...)>&& update_func,Group<EnumTypes>*... groups,
             std::vector<EnumTypes>... variables) 
     {
         std::vector<std::vector<Buffer*>> buffers_2d = {groups->getBuffers(variables)... };
@@ -133,19 +133,19 @@ namespace helper {
         size_t iters = std::min({groups->size()...});
         idx = 0;
         for(size_t i = 0; i < iters; i++) {
-            update_func({( reinterpret_cast<base_type<Types>*>(pointers[idx++]))[i] }...);
+            update_func(( reinterpret_cast<base_type<Types>*>(pointers[idx++]))[i]...);
             idx = 0;
         }
     }
 }
 template<class ...EnumTypes, class Func>
-void updateAny(std::vector<EnumTypes>... identifiers, Func f, Group<EnumTypes>*... groups) {
+void updateAny(std::vector<EnumTypes>... identifiers, Func&& f, Group<EnumTypes>*... groups) {
     helper::updateAny<EnumTypes...>(std::function(std::forward<Func>(f)), groups..., identifiers...);
 }
 
 template<class Enum>
 template<class Func>
-void Group<Enum>::update(std::vector<Enum> identifiers, Func f) {
+void Group<Enum>::update(std::vector<Enum> identifiers, Func&& f) {
     updateAny<Enum>(identifiers, f, this);
 }
 
