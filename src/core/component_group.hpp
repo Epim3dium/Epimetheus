@@ -18,14 +18,15 @@ class ComponentGroup : public Group<Enum> {
         : Group<Enum>(types_stored, variables) {}
 
     template <class... Types, class IntSeqT, IntSeqT... Ints>
-    void m_update_id_sequenced(std::vector<Enum> identifiers,
-                               std::function<void(EntityID, Types...)> f,
-                               std::integer_sequence<IntSeqT, Ints...> int_seq);
+    void
+    m_updateWithID_sequenced(std::vector<Enum> identifiers,
+                             std::function<void(EntityID, Types...)> f,
+                             std::integer_sequence<IntSeqT, Ints...> int_seq);
     template <class... Types>
-    void m_update_id(std::vector<Enum> identifiers,
-                     std::function<void(EntityID, Types...)> f) 
-    {
-        m_update_id_sequenced(identifiers, f, std::index_sequence_for<Types...>{});
+    void m_updateWithID(std::vector<Enum> identifiers,
+                        std::function<void(EntityID, Types...)> f) {
+        m_updateWithID_sequenced(identifiers, f,
+                                 std::index_sequence_for<Types...>{});
     }
 
 public:
@@ -78,8 +79,8 @@ public:
         }
     }
     template <class Func>
-    void update_id(std::vector<Enum> identifiers, Func f) {
-        m_update_id(identifiers, std::function(std::forward<Func>(f)));
+    void updateWithID(std::vector<Enum> identifiers, Func f) {
+        m_updateWithID(identifiers, std::function(std::forward<Func>(f)));
     }
 
     ComponentGroup(const ComponentGroup&) = delete;
@@ -93,7 +94,14 @@ public:
     class Factory;
 };
 namespace helper {
-
+template <class KeyType, class LeftValue>
+epi::Set<KeyType> MapToSet(const std::unordered_map<KeyType, LeftValue>& map) {
+    epi::Set<KeyType> result;
+    for (auto& i : map) {
+        result.insert(i.first);
+    }
+    return result;
+}
 template <class T>
 static inline std::vector<T>
 merge2DVectorsIntoOne(std::vector<std::vector<T>>&& vecs) {
@@ -104,50 +112,65 @@ merge2DVectorsIntoOne(std::vector<std::vector<T>>&& vecs) {
     }
     return result;
 }
-template <class Enum1, class Enum2, class... Types>
-void updateMatching(size_t intersection_size, ComponentGroup<Enum1>& g1,
-                    ComponentGroup<Enum2>& g2, std::vector<Enum1> ids1,
-                    std::vector<Enum2> ids2,
-                    std::function<void(Types...)> update_func) {
-    std::vector<std::vector<Buffer*>> buffers_2d = {g1.getBuffers(ids1),
-                                                    g2.getBuffers(ids2)};
-    std::vector<Buffer*> buffers = merge2DVectorsIntoOne(std::move(buffers_2d));
-    size_t idx = 0;
+
+template <class... Enum, size_t... Ints, class... Types>
+void updateMatchingAny_sequenced(size_t intersection_size,
+                                 std::function<void(Types...)> update_func,
+                                 std::integer_sequence<size_t, Ints...> int_seq,
+                                 ComponentGroup<Enum>&... groups,
+                                 std::vector<Enum>... identificators) 
+{
+    std::vector<std::vector<Buffer*>> buffers_2d = {
+        groups.getBuffers(identificators)...};
+    std::vector<Buffer*> buffers =
+        helper::merge2DVectorsIntoOne(std::move(buffers_2d));
     void* pointers[] = {
-        (buffers[idx++]->getData<base_type<Types>>().data())...};
-    idx = 0;
+        (buffers[Ints]->template getData<base_type<Types>>().data())...};
     for (size_t i = 0; i < intersection_size; i++) {
         update_func(
-            {(reinterpret_cast<base_type<Types>*>(pointers[idx++]))[i]}...);
-        idx = 0;
+            (reinterpret_cast<base_type<Types>*>(pointers[Ints]))[i]...);
     }
 }
+template <class... Enum, class... Types>
+void updateMatchingAny(size_t intersection_size,
+                              ComponentGroup<Enum>&... groups,
+                              std::vector<Enum>... identificators,
+                              std::function<void(Types...)> update_func) 
+{
+    updateMatchingAny_sequenced<Enum...>(
+        intersection_size, update_func, std::index_sequence_for<Types...>{},
+        groups..., identificators...);
+}
 }; // namespace helper
+
 template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
-void ComponentGroup<Enum>::m_update_id_sequenced(std::vector<Enum> identifiers,
-                           std::function<void(EntityID, Types...)> update_func,
-                           std::integer_sequence<IntSeqT, Ints...> int_seq) 
-{
+void ComponentGroup<Enum>::m_updateWithID_sequenced(
+    std::vector<Enum> identifiers,
+    std::function<void(EntityID, Types...)> update_func,
+    std::integer_sequence<IntSeqT, Ints...> int_seq) {
     std::vector<Buffer*> buffers = this->getBuffers(identifiers);
 
     void* pointers[] = {
         (buffers[Ints]->template getData<base_type<Types>>().data())...};
     for (size_t i = 0; i < this->size(); i++) {
-        update_func( m_entityID_list[i],
-            (reinterpret_cast<base_type<Types>*>(pointers[Ints]))[i]...);
+        update_func(m_entityID_list[i], (reinterpret_cast<base_type<Types>*>(
+                                            pointers[Ints]))[i]...);
     }
 }
-template <class Enum1, class Enum2, class Func>
-void updateMatching(ComponentGroup<Enum1>& g1, ComponentGroup<Enum2>& g2,
-                    std::vector<Enum1> ids1, std::vector<Enum2> ids2,
-                    Func update_func) {
+
+template <class... Enum, class Func>
+void updateMatchingAny(ComponentGroup<Enum>&... groups,
+                       std::vector<Enum>... identificators, Func update_func) {
     auto intersection =
-        IntersectMaps(g1.getEntityIDToIndexMap(), g2.getEntityIDToIndexMap());
-    g1.moveFoward(intersection);
-    g2.moveFoward(intersection);
-    helper::updateMatching(intersection.size(), g1, g2, ids1, ids2,
-                           std::function(std::forward<Func>(update_func)));
+        (helper::MapToSet(groups.getEntityIDToIndexMap()) ^ ...);
+
+    // move foward each group
+    ((groups.moveFoward(intersection)), ...);
+
+    helper::updateMatchingAny<Enum...>(
+        intersection.size(), groups..., identificators...,
+        std::function(std::forward<Func>(update_func)));
 }
 
 template <class Enum>

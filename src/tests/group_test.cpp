@@ -270,7 +270,7 @@ TEST(GroupTest, IndexedUpdate) {
         auto b = rng.Random<char>(0, 255U);
         group->push_back(std::tuple<char, char, char>{r, g, b}, gen_random(5, rng));
     }
-    group->update_indexed({eProperties::Color, eProperties::Shape}, 
+    group->updateWithIndex({eProperties::Color, eProperties::Shape}, 
         [&](size_t index, std::tuple<char, char, char> color, std::string name) {
             shapes[index].name = name;
             shapes[index].rgb = std::get<0>(color) << 16 | std::get<1>(color) << 8 | std::get<0>(color) << 0;

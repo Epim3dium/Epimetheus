@@ -53,7 +53,7 @@ private:
         return itr->second;
     }
     template <class... Types, class IntSeqT, IntSeqT... Ints>
-    void m_update_indexed_sequenced(std::vector<Enum> identifiers,
+    void m_updateWithIndex_sequenced(std::vector<Enum> identifiers,
                           std::function<void(size_t, Types...)>&& update_func,
                           std::integer_sequence<IntSeqT, Ints...> int_seq);
 
@@ -64,14 +64,15 @@ private:
 
     template <class... Types>
     void m_update(std::vector<Enum> identifiers,
-                  std::function<void(Types...)>&& update_func) {
+                  std::function<void(Types...)>&& update_func) 
+    {
         m_update_sequenced<Types...>(identifiers, std::move(update_func),
                                    std::index_sequence_for<Types...>{});
     }
     template <class... Types>
-    void m_update_indexed(std::vector<Enum> identifiers,
+    void m_updateWithIndex(std::vector<Enum> identifiers,
                   std::function<void(size_t, Types...)>&& update_func) {
-        m_update_indexed_sequenced<Types...>(identifiers, std::move(update_func),
+        m_updateWithIndex_sequenced<Types...>(identifiers, std::move(update_func),
                                    std::index_sequence_for<Types...>{});
     }
 
@@ -117,13 +118,16 @@ public:
 
     template <class Func>
     void update(std::vector<Enum> identifiers, Func&& f);
+    //where first argument in function f must be size_t (index)
     template <class Func>
-    void update_indexed(std::vector<Enum> identifiers, Func&& f);
+    void updateWithIndex(std::vector<Enum> identifiers, Func&& f);
 
     Group(const Group&) = delete;
     Group(Group&&) = delete;
     Group& operator=(const Group&) = delete;
     Group& operator=(Group&&) = delete;
+
+    virtual ~Group() {}
 
     std::vector<Buffer*> getBuffers(std::vector<Enum> identifiers) {
         std::vector<Buffer*> ptrs;
@@ -152,7 +156,7 @@ void Group<Enum>::m_update_sequenced(
 }
 template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
-void Group<Enum>::m_update_indexed_sequenced(
+void Group<Enum>::m_updateWithIndex_sequenced(
     std::vector<Enum> identifiers, std::function<void(size_t, Types...)>&& update_func,
     std::integer_sequence<IntSeqT, Ints...> int_seq) {
     std::vector<Buffer*> buffers = getBuffers(identifiers);
@@ -172,8 +176,8 @@ void Group<Enum>::update(std::vector<Enum> identifiers, Func&& f) {
 }
 template <class Enum>
 template <class Func>
-void Group<Enum>::update_indexed(std::vector<Enum> identifiers, Func&& f) {
-    m_update_indexed(identifiers, std::function(std::forward<Func>(f)));
+void Group<Enum>::updateWithIndex(std::vector<Enum> identifiers, Func&& f) {
+    m_updateWithIndex(identifiers, std::function(std::forward<Func>(f)));
 }
 
 template <class Enum>

@@ -1,3 +1,4 @@
+#include "utils/set.hpp"
 #include <iostream>
 #include <map>
 #include <unordered_map>
@@ -6,8 +7,7 @@
 
 namespace epi {
 template <typename KeyType, typename LeftValue, typename RightValue>
-std::set<KeyType>
-IntersectMaps(const std::unordered_map<KeyType, LeftValue>& left, 
+std::set<KeyType> IntersectMaps(const std::unordered_map<KeyType, LeftValue>& left, 
               const std::unordered_map<KeyType, RightValue>& right) {
     std::set<KeyType> result;
     auto& smaller = left.size() > right.size() ? right : left;
