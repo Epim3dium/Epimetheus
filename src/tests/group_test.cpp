@@ -119,17 +119,11 @@ TEST(GroupTest, GroupBenchmark) {
         VelyDouble,
     };
     struct AbstractEntity {
-        int64_t dumb0;
         std::string Name;
-        int64_t dumb1;
         double posx;
-        int64_t dumb2;
         double posy;
-        int64_t dumb3;
         bool isStatic;
-        int64_t dumb4;
         double velx;
-        int64_t dumb5;
         double vely;
         virtual void updateVel() = 0;
         virtual float getVely() = 0;
@@ -248,8 +242,8 @@ TEST(GroupTest, GroupBenchmark) {
     auto entities_r = results[1].sum(ankerl::nanobench::Result::Measure::elapsed);
     auto entitiesinherited_r = results[2].sum(ankerl::nanobench::Result::Measure::elapsed);
     auto vector_r = results[3].sum(ankerl::nanobench::Result::Measure::elapsed);
-    ASSERT_GE(entities_r, gorup_r);
-    ASSERT_GE(entitiesinherited_r, gorup_r);
+    EXPECT_GE(entities_r, gorup_r);
+    EXPECT_GE(entitiesinherited_r, gorup_r);
 }
 TEST(GroupTest, IndexedUpdate) {
     enum class eProperties {
@@ -282,7 +276,6 @@ TEST(GroupTest, IndexedUpdate) {
             shapes[index].rgb = std::get<0>(color) << 16 | std::get<1>(color) << 8 | std::get<0>(color) << 0;
         });
     for(size_t idx = 0; idx < batch_size; idx++) {
-        ASSERT_EQ(group->get<std::string>(eProperties::Shape, idx), shapes[idx].name);
+        EXPECT_EQ(group->get<std::string>(eProperties::Shape, idx), shapes[idx].name);
     }
-
 }

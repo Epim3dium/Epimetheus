@@ -22,7 +22,7 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
     comp_group->push_back<float, float, std::string>(getNewEntityID(), 0.f, 10.f, "second_player");
     comp_group->push_back<float, float, std::string>(getNewEntityID(), 33.f, 5.f,  "third_player");
     std::vector<EntityID> ids_to_delete;
-    comp_group->update({Player::HP, Player::Name},
+    comp_group->update_id({Player::HP, Player::Name},
         [&](EntityID id, float hp, std::string name) {
             if(hp == 0) {
                 ids_to_delete.push_back(id);
@@ -31,7 +31,7 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
     for(auto i : ids_to_delete) {
         comp_group->eraseByID(i);
     }
-    comp_group->update({Player::Name, Player::HP},
+    comp_group->update_id({Player::Name, Player::HP},
         [&](EntityID id, std::string name, float hp) {
             ASSERT_NE(hp, 0.f);
         });

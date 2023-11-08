@@ -53,7 +53,7 @@ private:
         return itr->second;
     }
     template <class... Types, class IntSeqT, IntSeqT... Ints>
-    void m_update_sequenced_indexed(std::vector<Enum> identifiers,
+    void m_update_indexed_sequenced(std::vector<Enum> identifiers,
                           std::function<void(size_t, Types...)>&& update_func,
                           std::integer_sequence<IntSeqT, Ints...> int_seq);
 
@@ -71,7 +71,7 @@ private:
     template <class... Types>
     void m_update_indexed(std::vector<Enum> identifiers,
                   std::function<void(size_t, Types...)>&& update_func) {
-        m_update_sequenced_indexed<Types...>(identifiers, std::move(update_func),
+        m_update_indexed_sequenced<Types...>(identifiers, std::move(update_func),
                                    std::index_sequence_for<Types...>{});
     }
 
@@ -152,7 +152,7 @@ void Group<Enum>::m_update_sequenced(
 }
 template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
-void Group<Enum>::m_update_sequenced_indexed(
+void Group<Enum>::m_update_indexed_sequenced(
     std::vector<Enum> identifiers, std::function<void(size_t, Types...)>&& update_func,
     std::integer_sequence<IntSeqT, Ints...> int_seq) {
     std::vector<Buffer*> buffers = getBuffers(identifiers);
