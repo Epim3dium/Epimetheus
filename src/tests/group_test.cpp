@@ -16,59 +16,11 @@ enum class eVelocity {
     vely,
     weird_product,
 };
-
-// Demonstrate some basic assertions.
-TEST(GroupTest, CreationSameTypeComponents) {
-    Group<eVelocity>::pointer group;
-    {
-        Group<eVelocity>::Factory fac;
-
-        fac.add<float>(eVelocity::velx);
-        fac.add<float>(eVelocity::vely);
-        fac.add<float>(eVelocity::weird_product);
-        group = fac.create();
-    }
-    group->push_back(21.f, 37.f, 0.f);
-    group->push_back(6.f, 9.f, 0.f);
-    group->update({eVelocity::velx, eVelocity::vely, eVelocity::weird_product}, side_effect_function);
-    // Expect equality.
-    EXPECT_EQ(group->get<float>(eVelocity::weird_product , 0), 777);
-    EXPECT_EQ(group->get<float>(eVelocity::weird_product , 1), 54);
-}
-
 enum class eCollider {
     Magnitude,
     isStatic,
     Offset,
 };
-TEST(GroupTest, ErasingComponentsAndLambdas) {
-    Group<eCollider>::pointer group;
-    {
-        Group<eCollider>::Factory fac;
-
-        fac.add<bool>(eCollider::isStatic);
-        fac.add<float>(eCollider::Magnitude);
-        fac.add<float>(eCollider::Offset);
-        group = fac.create();
-    }
-    group->push_back(false, 10.f,   0.f);
-    group->push_back(true,  20.f,   0.f);
-    group->push_back(true, 200.f,  6969.f);
-    group->push_back(false, 1000.f, 2112.f);
-    group->update({eCollider::isStatic, eCollider::Magnitude, eCollider::Offset}, 
-        [](bool isStatic, float mag, float& offset) {
-            if(isStatic)
-                return;
-            offset = mag * isStatic;
-        }
-    );
-    group->erase(1U);
-    // Expect equality.
-    EXPECT_EQ(group->get<float>(eCollider::Offset , 2), 6969.f);
-
-    group->erase(0U);
-    EXPECT_EQ(group->get<float>(eCollider::Offset , 0), 6969.f);
-}
 
 std::string gen_random(const int len, RNG& rng) {
     static const char alphanum[] =
@@ -105,6 +57,56 @@ void update_vel(double& py, double vely, double& px, double velx) {
     px += velx * delT;
     ankerl::nanobench::doNotOptimizeAway(py);
     ankerl::nanobench::doNotOptimizeAway(px);
+}
+
+//================================================================================
+//TESTS
+//================================================================================
+TEST(GroupTest, CreationSameTypeComponents) {
+    Group<eVelocity>::pointer group;
+    {
+        Group<eVelocity>::Factory fac;
+
+        fac.add<float>(eVelocity::velx);
+        fac.add<float>(eVelocity::vely);
+        fac.add<float>(eVelocity::weird_product);
+        group = fac.create();
+    }
+    group->push_back(21.f, 37.f, 0.f);
+    group->push_back(6.f, 9.f, 0.f);
+    group->update({eVelocity::velx, eVelocity::vely, eVelocity::weird_product}, side_effect_function);
+    // Expect equality.
+    EXPECT_EQ(group->get<float>(eVelocity::weird_product , 0), 777);
+    EXPECT_EQ(group->get<float>(eVelocity::weird_product , 1), 54);
+}
+
+TEST(GroupTest, ErasingComponentsAndLambdas) {
+    Group<eCollider>::pointer group;
+    {
+        Group<eCollider>::Factory fac;
+
+        fac.add<bool>(eCollider::isStatic);
+        fac.add<float>(eCollider::Magnitude);
+        fac.add<float>(eCollider::Offset);
+        group = fac.create();
+    }
+    group->push_back(false, 10.f,   0.f);
+    group->push_back(true,  20.f,   0.f);
+    group->push_back(true, 200.f,  6969.f);
+    group->push_back(false, 1000.f, 2112.f);
+    group->update({eCollider::isStatic, eCollider::Magnitude, eCollider::Offset}, 
+        [](bool isStatic, float mag, float& offset) {
+            if(isStatic)
+                return;
+            offset = mag * isStatic;
+        }
+    );
+    group->erase(1U);
+    // Expect equality.
+    EXPECT_EQ(group->get<float>(eCollider::Offset , 2), 6969.f);
+
+    group->erase(0U);
+    EXPECT_EQ(group->get<float>(eCollider::Offset , 0), 6969.f);
 }
 TEST(GroupTest, GroupBenchmark) {
     RNG rng;
@@ -169,8 +171,8 @@ TEST(GroupTest, GroupBenchmark) {
             : posx(d1), posy(d2), isStatic(b), velx(d3), vely(d4) {}
     };
     std::vector<std::tuple<std::string, double, double, bool, double, double>> data;
-    size_t iter_count = 100000;
-    for(auto i = iter_count; i--;) {
+    size_t batch_size = 100000;
+    for(auto i = batch_size; i--;) {
         data.push_back({
             gen_random(10, rng), 
             rng.Random<double>(0.0, 1000.0),
@@ -248,4 +250,39 @@ TEST(GroupTest, GroupBenchmark) {
     auto vector_r = results[3].sum(ankerl::nanobench::Result::Measure::elapsed);
     ASSERT_GE(entities_r, gorup_r);
     ASSERT_GE(entitiesinherited_r, gorup_r);
+}
+TEST(GroupTest, IndexedUpdate) {
+    enum class eProperties {
+        Shape,
+        Color
+    };
+    Group<eProperties>::pointer group;
+    {
+        Group<eProperties>::Factory fac;
+        fac.add<std::tuple<char, char, char>>(eProperties::Color );
+        fac.add<std::string>(eProperties::Shape );
+        group = fac.create();
+    }
+    size_t batch_size = 1000;
+    struct TempShape {
+        std::string name;
+        int rgb;
+    };
+    std::vector<TempShape> shapes(batch_size);
+    RNG rng;
+    for(size_t i = 0; i < batch_size; i++) {
+        auto r = rng.Random<char>(0, 255U);
+        auto g = rng.Random<char>(0, 255U);
+        auto b = rng.Random<char>(0, 255U);
+        group->push_back(std::tuple<char, char, char>{r, g, b}, gen_random(5, rng));
+    }
+    group->update_indexed({eProperties::Color, eProperties::Shape}, 
+        [&](size_t index, std::tuple<char, char, char> color, std::string name) {
+            shapes[index].name = name;
+            shapes[index].rgb = std::get<0>(color) << 16 | std::get<1>(color) << 8 | std::get<0>(color) << 0;
+        });
+    for(size_t idx = 0; idx < batch_size; idx++) {
+        ASSERT_EQ(group->get<std::string>(eProperties::Shape, idx), shapes[idx].name);
+    }
+
 }
