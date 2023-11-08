@@ -103,6 +103,16 @@ public:
 
 };
 namespace helper {
+
+    template<class T>
+    static inline std::vector<T> merge2DVectorsIntoOne(std::vector<std::vector<T>>&& vecs) {
+        std::vector<T> result;
+        result.reserve(16U);
+        for(auto& v : vecs) {
+            result.insert(result.end(), v.begin(), v.end());
+        }
+        return result;
+    }
     template<class Enum1, class Enum2, class ...Types>
     void updateMatching(
             size_t intersection_size,

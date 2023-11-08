@@ -91,12 +91,22 @@ void update_values(std::string& n, double& px, double& py, bool iss, double velx
     }
     n += std::to_string(px) + ", " + std::to_string(py);
 }
-void update_values_small(double& px, double vely) {
-    for(double i = 0; i < vely; i += 0.01) {
-        px += sqrt(sin(i * i));
-    }
+double delT = 1.f / 60.f;
+void update_velX(double& px, double velx) {
+    px += velx * delT;
+    ankerl::nanobench::doNotOptimizeAway(px);
 }
-TEST(GroupTest, GroupPerformanceTest) {
+void update_velY(double& py, double vely) {
+    py += vely * delT;
+    ankerl::nanobench::doNotOptimizeAway(py);
+}
+void update_vel(double& py, double vely, double& px, double velx) {
+    py += vely * delT;
+    px += velx * delT;
+    ankerl::nanobench::doNotOptimizeAway(py);
+    ankerl::nanobench::doNotOptimizeAway(px);
+}
+TEST(GroupTest, GroupBenchmark) {
     RNG rng;
     enum class eVariables {
         NameString,
@@ -105,6 +115,38 @@ TEST(GroupTest, GroupPerformanceTest) {
         isStaticBool,
         VelxDouble,
         VelyDouble,
+    };
+    struct AbstractEntity {
+        int64_t dumb0;
+        std::string Name;
+        int64_t dumb1;
+        double posx;
+        int64_t dumb2;
+        double posy;
+        int64_t dumb3;
+        bool isStatic;
+        int64_t dumb4;
+        double velx;
+        int64_t dumb5;
+        double vely;
+        virtual void updateVel() = 0;
+        virtual float getVely() = 0;
+        virtual float getVelx() = 0;
+        AbstractEntity(std::string s, double d1, double d2, bool b, double d3, double d4) 
+            : posx(d1), posy(d2), isStatic(b), velx(d3), vely(d4) {}
+    };
+    struct EntityInherited : public AbstractEntity {
+        float getVely() override {
+            return vely;
+        }
+        float getVelx() override {
+            return velx;
+        }
+        void updateVel() override {
+            update_velX(posx, getVely());
+        }
+        EntityInherited(std::string s, double d1, double d2, bool b, double d3, double d4) 
+            : AbstractEntity(s, d1, d2, b, d3, d4) {}
     };
 
     struct Entity {
@@ -120,19 +162,22 @@ TEST(GroupTest, GroupPerformanceTest) {
         double velx;
         int64_t dumb5;
         double vely;
+        void update() {
+            update_velX(posx, velx);
+        }
         Entity(std::string s, double d1, double d2, bool b, double d3, double d4) 
             : posx(d1), posy(d2), isStatic(b), velx(d3), vely(d4) {}
     };
     std::vector<std::tuple<std::string, double, double, bool, double, double>> data;
-    size_t iter_count = 500000;
+    size_t iter_count = 100000;
     for(auto i = iter_count; i--;) {
         data.push_back({
             gen_random(10, rng), 
-            rng.Random<double>(0.0, 1.0),
-            rng.Random<double>(0.0, 1.0),
+            rng.Random<double>(0.0, 1000.0),
+            rng.Random<double>(0.0, 2000.0),
             rng.Random() > 0.5 ? true : false,
-            rng.Random<double>(0.0, 10.0),
-            rng.Random<double>(0.0, 1.0)
+            rng.Random<double>(0.0, 3000.0),
+            rng.Random<double>(0.0, 4000.0)
         });
     }
     Group<eVariables>::pointer group;
@@ -154,9 +199,11 @@ TEST(GroupTest, GroupPerformanceTest) {
     std::vector<double     >VelyDouble;
 
     std::vector<Entity*> entities;
+    std::vector<AbstractEntity*> entities_inherited;
     for(auto& d : data ) {
         group->push_back(std::get<0>(d), std::get<1>(d), std::get<2>(d), std::get<3>(d), std::get<4>(d), std::get<5>(d));
         entities.push_back(new Entity{std::get<0>(d), std::get<1>(d), std::get<2>(d), std::get<3>(d), std::get<4>(d), std::get<5>(d)});
+        entities_inherited.push_back(new EntityInherited{std::get<0>(d), std::get<1>(d), std::get<2>(d), std::get<3>(d), std::get<4>(d), std::get<5>(d)});
         NameString.push_back(std::get<0>(d));
         PosxDouble.push_back(std::get<1>(d));
         PosyDouble.push_back(std::get<2>(d));
@@ -164,19 +211,41 @@ TEST(GroupTest, GroupPerformanceTest) {
         VelxDouble.push_back(std::get<4>(d));
         VelyDouble.push_back(std::get<5>(d));
     }
+    ankerl::nanobench::Bench b;
+    b.title("Cluster Processing")
+        .minEpochIterations(100U)
+        .relative(true)
+        .performanceCounters(true);
 
-    ankerl::nanobench::Bench().run("group_small", [&]() {
-        group->update({eVariables::PosxDouble, eVariables::VelyDouble}, update_values_small);
+    b.run("group", [&]() 
+    {
+        group->update({eVariables::PosxDouble, eVariables::VelxDouble}, update_velX);
+        // group->update({eVariables::PosyDouble, eVariables::VelyDouble}, update_velY);
     });
 
-    ankerl::nanobench::Bench().run("entitiess_small", [&]() {
+    b.run("entitiess", [&]() 
+    {
         for(auto e : entities) {
-            update_values_small(e->posx, e->vely);
+            e->update();
         }
     });
-    ankerl::nanobench::Bench().run("vector_small", [&]() {
+    b.run("entitiessinherited", [&]() 
+    {
+        for(auto e : entities_inherited) {
+            e->updateVel();
+        }
+    });
+    b.run("vector", [&]() 
+    {
         for(size_t i = 0; i < entities.size(); i++) {
-            update_values_small(PosxDouble[i], VelyDouble[i]);
+            update_velX(PosxDouble[i], VelxDouble[i]);
         }
     });
+    auto results = b.results();
+    auto gorup_r = results[0].sum(ankerl::nanobench::Result::Measure::elapsed);
+    auto entities_r = results[1].sum(ankerl::nanobench::Result::Measure::elapsed);
+    auto entitiesinherited_r = results[2].sum(ankerl::nanobench::Result::Measure::elapsed);
+    auto vector_r = results[3].sum(ankerl::nanobench::Result::Measure::elapsed);
+    ASSERT_GE(entities_r, gorup_r);
+    ASSERT_GE(entitiesinherited_r, gorup_r);
 }

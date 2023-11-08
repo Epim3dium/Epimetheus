@@ -48,6 +48,9 @@ public:
         assert(typeid(T).hash_code() == m_type_hash);
         return std::span<T>(reinterpret_cast<T*>(mem_block), m_elem_count );
     }
+    inline void* getPtr() const {
+        return mem_block;
+    }
     void clear() {
         tail = mem_block;
         m_elem_count = 0;
