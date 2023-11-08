@@ -73,7 +73,7 @@ TEST(ComponentGroupTest, UpdateMatching) {
     collider_group->push_back(platform, true, std::string("metal"));
     collider_group->push_back(trigger, true, std::string("none"));
     collider_group->push_back(enemy, false, std::string("skin"));
-    updateMatchingAny<Rigidbody, Collider>(*rigidbody_group.get(), *collider_group.get(),
+    updateMatching<Rigidbody, Collider>(*rigidbody_group.get(), *collider_group.get(),
         {Rigidbody::floatVelx, Rigidbody::floatVely}, {Collider::boolIsStatic},
         [](float& velx, float& vely, bool isStatic) {
             if(isStatic) {

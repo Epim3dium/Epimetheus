@@ -132,7 +132,7 @@ void updateMatchingAny_sequenced(size_t intersection_size,
     }
 }
 template <class... Enum, class... Types>
-void updateMatchingAny(size_t intersection_size,
+void updateMatching(size_t intersection_size,
                               ComponentGroup<Enum>&... groups,
                               std::vector<Enum>... identificators,
                               std::function<void(Types...)> update_func) 
@@ -160,7 +160,7 @@ void ComponentGroup<Enum>::m_updateWithID_sequenced(
 }
 
 template <class... Enum, class Func>
-void updateMatchingAny(ComponentGroup<Enum>&... groups,
+void updateMatching(ComponentGroup<Enum>&... groups,
                        std::vector<Enum>... identificators, Func update_func) {
     auto intersection =
         (helper::MapToSet(groups.getEntityIDToIndexMap()) ^ ...);
@@ -168,7 +168,7 @@ void updateMatchingAny(ComponentGroup<Enum>&... groups,
     // move foward each group
     ((groups.moveFoward(intersection)), ...);
 
-    helper::updateMatchingAny<Enum...>(
+    helper::updateMatching<Enum...>(
         intersection.size(), groups..., identificators...,
         std::function(std::forward<Func>(update_func)));
 }
