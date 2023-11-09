@@ -61,6 +61,7 @@ TEST(ComponentGroupTest, UpdateMatching) {
         fac.add<std::string>(Collider::StringMaterial);
         collider_group = fac.create();
     }
+
     auto player   = Entities::getNewID();
     auto platform = Entities::getNewID();
     auto trigger  = Entities::getNewID();
