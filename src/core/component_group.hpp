@@ -2,7 +2,7 @@
 #define EPI_COMPONENT_GROUP_HPP
 #include "entity.hpp"
 #include "group.hpp"
-#include "utils/map_key_intersection.hpp"
+#include "core/utils/set.hpp"
 #include <set>
 
 namespace epi {

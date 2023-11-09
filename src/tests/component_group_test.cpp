@@ -1,6 +1,7 @@
 
 #include <gtest/gtest.h>
 #include "core/component_group.hpp"
+#include "core/entity.hpp"
 using namespace epi;
 
 enum class Player {
@@ -18,9 +19,9 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
         fac.add<std::string>(Player::Name );
         comp_group = fac.create();
     }
-    comp_group->push_back<float, float, std::string>(getNewEntityID(), 100.f, 1.f, "first_player");
-    comp_group->push_back<float, float, std::string>(getNewEntityID(), 0.f, 10.f, "second_player");
-    comp_group->push_back<float, float, std::string>(getNewEntityID(), 33.f, 5.f,  "third_player");
+    comp_group->push_back<float, float, std::string>(Entities::getNewID(), 100.f, 1.f, "first_player");
+    comp_group->push_back<float, float, std::string>(Entities::getNewID(), 0.f, 10.f, "second_player");
+    comp_group->push_back<float, float, std::string>(Entities::getNewID(), 33.f, 5.f,  "third_player");
     std::vector<EntityID> ids_to_delete;
     comp_group->updateWithID({Player::HP, Player::Name},
         [&](EntityID id, float hp, std::string name) {
@@ -60,10 +61,10 @@ TEST(ComponentGroupTest, UpdateMatching) {
         fac.add<std::string>(Collider::StringMaterial);
         collider_group = fac.create();
     }
-    auto player = getNewEntityID();
-    auto platform = getNewEntityID();
-    auto trigger = getNewEntityID();
-    auto enemy = getNewEntityID();
+    auto player   = Entities::getNewID();
+    auto platform = Entities::getNewID();
+    auto trigger  = Entities::getNewID();
+    auto enemy    = Entities::getNewID();
 
     rigidbody_group->push_back(player, 100.f, 100.f);
     rigidbody_group->push_back(platform, 0.f, 0.f);

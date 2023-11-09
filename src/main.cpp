@@ -25,6 +25,8 @@ int main(int argc, char** argv)
     GlobalGetter<eTBD>::group = ComponentGroup<eTBD>::Factory().create();
 
     testing::InitGoogleTest(&argc, argv);
-    RUN_ALL_TESTS();
-    return 0;
+    int err;
+    if((err = RUN_ALL_TESTS())) {
+        return err;
+    }
 }

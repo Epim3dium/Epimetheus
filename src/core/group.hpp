@@ -187,9 +187,10 @@ class Group<Enum>::Factory {
 
 public:
     template <class T>
-    void add(Enum identifier) {
+    Group<Enum>::Factory& add(Enum identifier) {
         m_init_values.push_back({typeid(T), sizeof(T)});
         m_identifiers.push_back(identifier);
+        return *this;
     }
     std::unique_ptr<Group> create() {
         std::unique_ptr<Group> result{new Group(m_init_values, m_identifiers)};
