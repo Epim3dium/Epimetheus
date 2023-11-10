@@ -9,10 +9,13 @@ namespace epi {
 
 template <class Enum>
 class ComponentGroup : public Group<Enum> {
+
+    typedef Entities::IDtype IDtype;
+
     typedef typename Group<Enum>::HashSize HashSize;
 
-    std::unordered_map<EntityID, size_t> m_entityID_to_index_map;
-    std::vector<EntityID> m_entityID_list;
+    std::unordered_map<IDtype, size_t> m_entityID_to_index_map;
+    std::vector<IDtype> m_entityID_list;
 
     ComponentGroup(std::span<HashSize> types_stored, std::span<Enum> variables)
         : Group<Enum>(types_stored, variables) {}
@@ -20,22 +23,22 @@ class ComponentGroup : public Group<Enum> {
     template <class... Types, class IntSeqT, IntSeqT... Ints>
     void
     m_updateWithID_sequenced(std::vector<Enum> identifiers,
-                             std::function<void(EntityID, Types...)> f,
+                             std::function<void(IDtype, Types...)> f,
                              std::integer_sequence<IntSeqT, Ints...> int_seq);
     template <class... Types>
     void m_updateWithID(std::vector<Enum> identifiers,
-                        std::function<void(EntityID, Types...)> f) {
+                        std::function<void(IDtype, Types...)> f) {
         m_updateWithID_sequenced(identifiers, f,
                                  std::index_sequence_for<Types...>{});
     }
 
 public:
-    const std::unordered_map<EntityID, size_t>& getEntityIDToIndexMap() const {
+    const std::unordered_map<IDtype, size_t>& getEntityIDToIndexMap() const {
         return m_entityID_to_index_map;
     }
     typedef std::unique_ptr<ComponentGroup> pointer;
     template <class T, class... Rest>
-    void push_back(EntityID entityid, T v, Rest... vals) {
+    void push_back(IDtype entityid, T v, Rest... vals) {
         m_entityID_to_index_map.insert_or_assign(entityid, this->size());
         m_entityID_list.push_back(entityid);
         Group<Enum>::push_back(v, vals...);
@@ -52,7 +55,7 @@ public:
         m_entityID_list.pop_back();
         Group<Enum>::pop_back(index);
     }
-    void eraseByID(EntityID id) {
+    void eraseByID(IDtype id) {
         auto index = m_entityID_to_index_map.at(id);
         erase(index);
     }
@@ -63,7 +66,7 @@ public:
     }
     template <class T>
     inline std::optional<std::reference_wrapper<T>> getByID(Enum variable,
-                                                            EntityID id) {
+                                                            IDtype id) {
         auto itr = m_entityID_to_index_map.find(id);
         if (itr == m_entityID_to_index_map.end()) {
             return {};
@@ -147,7 +150,7 @@ template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
 void ComponentGroup<Enum>::m_updateWithID_sequenced(
     std::vector<Enum> identifiers,
-    std::function<void(EntityID, Types...)> update_func,
+    std::function<void(IDtype, Types...)> update_func,
     std::integer_sequence<IntSeqT, Ints...> int_seq) {
     std::vector<Buffer*> buffers = this->getBuffers(identifiers);
 
@@ -180,9 +183,10 @@ class ComponentGroup<Enum>::Factory {
 
 public:
     template <class T>
-    void add(Enum identifier) {
+    ComponentGroup<Enum>::Factory& add(Enum identifier) {
         m_init_values.push_back({typeid(T), sizeof(T)});
         m_identifiers.push_back(identifier);
+        return *this;
     }
     ComponentGroup::pointer create() {
         std::unique_ptr<ComponentGroup> result{

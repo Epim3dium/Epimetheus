@@ -19,12 +19,12 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
         fac.add<std::string>(Player::Name );
         comp_group = fac.create();
     }
-    comp_group->push_back<float, float, std::string>(Entities::getNewID(), 100.f, 1.f, "first_player");
-    comp_group->push_back<float, float, std::string>(Entities::getNewID(), 0.f, 10.f, "second_player");
-    comp_group->push_back<float, float, std::string>(Entities::getNewID(), 33.f, 5.f,  "third_player");
-    std::vector<EntityID> ids_to_delete;
+    comp_group->push_back<float, float, std::string>(Entities::create(), 100.f, 1.f, "first_player");
+    comp_group->push_back<float, float, std::string>(Entities::create(), 0.f, 10.f, "second_player");
+    comp_group->push_back<float, float, std::string>(Entities::create(), 33.f, 5.f,  "third_player");
+    std::vector<Entities::IDtype> ids_to_delete;
     comp_group->updateWithID({Player::HP, Player::Name},
-        [&](EntityID id, float hp, std::string name) {
+        [&](Entities::IDtype id, float hp, std::string name) {
             if(hp == 0) {
                 ids_to_delete.push_back(id);
             }
@@ -33,7 +33,7 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
         comp_group->eraseByID(i);
     }
     comp_group->updateWithID({Player::Name, Player::HP},
-        [&](EntityID id, std::string name, float hp) {
+        [&](Entities::IDtype id, std::string name, float hp) {
             ASSERT_NE(hp, 0.f);
         });
 }
@@ -62,10 +62,10 @@ TEST(ComponentGroupTest, UpdateMatching) {
         collider_group = fac.create();
     }
 
-    auto player   = Entities::getNewID();
-    auto platform = Entities::getNewID();
-    auto trigger  = Entities::getNewID();
-    auto enemy    = Entities::getNewID();
+    auto player   = Entities::create();
+    auto platform = Entities::create();
+    auto trigger  = Entities::create();
+    auto enemy    = Entities::create();
 
     rigidbody_group->push_back(player, 100.f, 100.f);
     rigidbody_group->push_back(platform, 0.f, 0.f);

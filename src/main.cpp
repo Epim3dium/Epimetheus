@@ -9,21 +9,9 @@
 
 using namespace epi;
 
-template<class Enum>
-struct GlobalGetter {
-    static typename ComponentGroup<Enum>::pointer group;
-};
-template<class Enum>
-typename ComponentGroup<Enum>::pointer GlobalGetter<Enum>::group = {};
-
-enum class eTBD {
-};
-
 #include <gtest/gtest.h>
 int main(int argc, char** argv)
 {
-    GlobalGetter<eTBD>::group = ComponentGroup<eTBD>::Factory().create();
-
     testing::InitGoogleTest(&argc, argv);
     int err;
     if((err = RUN_ALL_TESTS())) {
