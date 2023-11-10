@@ -1,6 +1,7 @@
 #ifndef EPI_INPUT_HANDLER_HPP
 #define EPI_INPUT_HANDLER_HPP
 #include "SFML/Window/Event.hpp"
+#include "debug/log.hpp"
 #include <map>
 namespace epi {
 
@@ -12,9 +13,8 @@ public:
     }
     void process(const sf::Event& e) {
         auto [begin, end] = m_callbacks.equal_range(e.type);
-        for(;begin != end; begin++) {
-            begin->second(e);
-            begin ++;
+        for(auto itr = begin; itr != end; itr++) {
+            itr->second(e);
         }
     }
 };

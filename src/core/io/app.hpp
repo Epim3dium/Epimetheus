@@ -7,11 +7,14 @@ namespace epi {
 
 class App {
     sf::RenderWindow m_window;
-    EventHandler m_event_handler;
 
+protected:
+    EventHandler event_handler;
+    float delT = 1.f / 60.f;
 public:
     const std::string title;
 
+    virtual bool onSetup() { return true; }
     virtual void onUpdate() = 0;
     virtual void onRender(sf::RenderWindow& window) = 0;
     void run();

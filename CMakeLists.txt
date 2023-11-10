@@ -7,13 +7,9 @@ project(epimetheus
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 
-if(POLICY CMP0079 )
-  cmake_policy(SET CMP0079 NEW)
-endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-O3")
 set(CMAKE_C_FLAGS_DEBUG "-O3")
 
 add_subdirectory(dependancies)
 add_subdirectory(src)
 
-include(cmake/Install.cmake)

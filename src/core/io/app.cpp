@@ -3,13 +3,16 @@
 using namespace epi;
 
 void App::run() {
+    if(!onSetup())
+        return;
+    m_window.setFramerateLimit(60U);
     while (m_window.isOpen()) {
         sf::Event event;
         while (m_window.pollEvent(event)) {
             if (event.type == sf::Event::Closed) {
                 m_window.close();
             } else {
-                m_event_handler.process(event);
+                event_handler.process(event);
             }
         }
 

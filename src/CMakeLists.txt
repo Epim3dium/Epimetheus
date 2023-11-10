@@ -43,3 +43,4 @@ gtest_discover_tests(epimetheus)
 
 
 include_directories(.)
+include(../cmake/Install.cmake)
