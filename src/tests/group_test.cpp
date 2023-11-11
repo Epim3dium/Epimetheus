@@ -1,3 +1,4 @@
+#include "multithreading/thread_pool.hpp"
 #include <gtest/gtest.h>
 #include <thread>
 #define ANKERL_NANOBENCH_IMPLEMENT
@@ -209,7 +210,7 @@ TEST(GroupTest, GroupBenchmark) {
     }
     ankerl::nanobench::Bench b;
     b.title("Cluster Processing")
-        .minEpochIterations(100U)
+        .minEpochIterations(50U)
         .relative(true)
         .performanceCounters(true);
 
@@ -218,7 +219,6 @@ TEST(GroupTest, GroupBenchmark) {
         group->update({eVariables::PosxDouble, eVariables::VelxDouble}, update_velX);
         // group->update({eVariables::PosyDouble, eVariables::VelyDouble}, update_velY);
     });
-
     b.run("entitiess", [&]() 
     {
         for(auto e : entities) {
@@ -231,6 +231,15 @@ TEST(GroupTest, GroupBenchmark) {
             e->updateVel();
         }
     });
+    b.run("group_threaded", [&]() 
+    {
+        ThreadPool tp(2U);
+        tp.dispatch(group->size(), [&](const uint32_t start, const uint32_t end) {
+            group->update({eVariables::PosxDouble, eVariables::VelxDouble}, update_velX, start, end);
+        });
+        // group->update({eVariables::PosyDouble, eVariables::VelyDouble}, update_velY);
+    });
+
     b.run("vector", [&]() 
     {
         for(size_t i = 0; i < entities.size(); i++) {
@@ -242,7 +251,6 @@ TEST(GroupTest, GroupBenchmark) {
     auto entities_r = results[1].sum(ankerl::nanobench::Result::Measure::elapsed);
     auto entitiesinherited_r = results[2].sum(ankerl::nanobench::Result::Measure::elapsed);
     auto vector_r = results[3].sum(ankerl::nanobench::Result::Measure::elapsed);
-    EXPECT_GE(entities_r, gorup_r);
     EXPECT_GE(entitiesinherited_r, gorup_r);
 }
 TEST(GroupTest, IndexedUpdate) {

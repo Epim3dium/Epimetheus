@@ -10,7 +10,7 @@
 #include "buffer.hpp"
 
 namespace epi {
-#define EPI_GROUP_MAX_ELEMENT_COUNT 100000
+#define EPI_GROUP_MAX_ELEMENT_COUNT 10000000
 
 template <typename T>
 using base_type =
@@ -55,25 +55,25 @@ private:
     template <class... Types, class IntSeqT, IntSeqT... Ints>
     void m_updateWithIndex_sequenced(std::vector<Enum> identifiers,
                           std::function<void(size_t, Types...)>&& update_func,
-                          std::integer_sequence<IntSeqT, Ints...> int_seq);
+                          std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end);
 
     template <class... Types, class IntSeqT, IntSeqT... Ints>
     void m_update_sequenced(std::vector<Enum> identifiers,
                           std::function<void(Types...)>&& update_func,
-                          std::integer_sequence<IntSeqT, Ints...> int_seq);
+                          std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end);
 
     template <class... Types>
     void m_update(std::vector<Enum> identifiers,
-                  std::function<void(Types...)>&& update_func) 
+                  std::function<void(Types...)>&& update_func, size_t start, size_t end) 
     {
         m_update_sequenced<Types...>(identifiers, std::move(update_func),
-                                   std::index_sequence_for<Types...>{});
+                                   std::index_sequence_for<Types...>{}, start, end);
     }
     template <class... Types>
     void m_updateWithIndex(std::vector<Enum> identifiers,
-                  std::function<void(size_t, Types...)>&& update_func) {
+                  std::function<void(size_t, Types...)>&& update_func, size_t start, size_t end) {
         m_updateWithIndex_sequenced<Types...>(identifiers, std::move(update_func),
-                                   std::index_sequence_for<Types...>{});
+                                   std::index_sequence_for<Types...>{}, start, end);
     }
 
 public:
@@ -98,7 +98,7 @@ public:
         }
         m_instances--;
     }
-    void pop_back(size_t index) {
+    void pop_back() {
         for (auto& b : m_buffers) {
             b.pop_back();
         }
@@ -118,9 +118,14 @@ public:
 
     template <class Func>
     void update(std::vector<Enum> identifiers, Func&& f);
+    template <class Func>
+    void update(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end);
+
     //where first argument in function f must be size_t (index)
     template <class Func>
     void updateWithIndex(std::vector<Enum> identifiers, Func&& f);
+    template <class Func>
+    void updateWithIndex(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end);
 
     Group(const Group&) = delete;
     Group(Group&&) = delete;
@@ -144,12 +149,13 @@ template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
 void Group<Enum>::m_update_sequenced(
     std::vector<Enum> identifiers, std::function<void(Types...)>&& update_func,
-    std::integer_sequence<IntSeqT, Ints...> int_seq) {
+    std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end) 
+{
     std::vector<Buffer*> buffers = getBuffers(identifiers);
 
     void* pointers[] = {
         (buffers[Ints]->template getData<base_type<Types>>().data())...};
-    for (size_t i = 0; i < m_instances; i++) {
+    for (size_t i = start; i < std::min(end, size()); i++) {
         update_func(
             (reinterpret_cast<base_type<Types>*>(pointers[Ints]))[i]...);
     }
@@ -158,26 +164,36 @@ template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
 void Group<Enum>::m_updateWithIndex_sequenced(
     std::vector<Enum> identifiers, std::function<void(size_t, Types...)>&& update_func,
-    std::integer_sequence<IntSeqT, Ints...> int_seq) {
+    std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end) {
     std::vector<Buffer*> buffers = getBuffers(identifiers);
 
     void* pointers[] = {
         (buffers[Ints]->template getData<base_type<Types>>().data())...};
-    for (size_t i = 0; i < m_instances; i++) {
+    for (size_t i = start; i < std::min(end, size()); i++) {
         update_func(i,
             (reinterpret_cast<base_type<Types>*>(pointers[Ints]))[i]...);
     }
+}
+template <class Enum>
+template <class Func>
+void Group<Enum>::update(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end) {
+    m_update(identifiers, std::function(std::forward<Func>(f)), start, end);
 }
 
 template <class Enum>
 template <class Func>
 void Group<Enum>::update(std::vector<Enum> identifiers, Func&& f) {
-    m_update(identifiers, std::function(std::forward<Func>(f)));
+    update(identifiers, f, 0, size());
+}
+template <class Enum>
+template <class Func>
+void Group<Enum>::updateWithIndex(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end) {
+    m_updateWithIndex(identifiers, std::function(std::forward<Func>(f)), start, end);
 }
 template <class Enum>
 template <class Func>
 void Group<Enum>::updateWithIndex(std::vector<Enum> identifiers, Func&& f) {
-    m_updateWithIndex(identifiers, std::function(std::forward<Func>(f)));
+    updateWithIndex(identifiers, f, 0, size());
 }
 
 template <class Enum>

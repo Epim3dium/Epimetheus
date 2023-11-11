@@ -10,7 +10,6 @@ class App {
 
 protected:
     EventHandler event_handler;
-    float delT = 1.f / 60.f;
 public:
     const std::string title;
 

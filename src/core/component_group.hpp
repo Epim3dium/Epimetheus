@@ -1,44 +1,53 @@
 #ifndef EPI_COMPONENT_GROUP_HPP
 #define EPI_COMPONENT_GROUP_HPP
-#include "entity.hpp"
 #include "group.hpp"
-#include "core/utils/set.hpp"
+#include "utils/set.hpp"
 #include <set>
 
 namespace epi {
 
 template <class Enum>
-class ComponentGroup : public Group<Enum> {
+class ComponentGroup : private Group<Enum> {
 
-    typedef Entities::IDtype IDtype;
+    typedef uint64_t ID_t;
 
-    typedef typename Group<Enum>::HashSize HashSize;
-
-    std::unordered_map<IDtype, size_t> m_entityID_to_index_map;
-    std::vector<IDtype> m_entityID_list;
-
-    ComponentGroup(std::span<HashSize> types_stored, std::span<Enum> variables)
-        : Group<Enum>(types_stored, variables) {}
+    std::unordered_map<ID_t, size_t> m_entityID_to_index_map;
+    std::vector<ID_t> m_entityID_list;
 
     template <class... Types, class IntSeqT, IntSeqT... Ints>
     void
     m_updateWithID_sequenced(std::vector<Enum> identifiers,
-                             std::function<void(IDtype, Types...)> f,
-                             std::integer_sequence<IntSeqT, Ints...> int_seq);
+                             std::function<void(ID_t, Types...)> f,
+                             std::integer_sequence<IntSeqT, Ints...> int_seq,
+                             size_t start, size_t end);
     template <class... Types>
     void m_updateWithID(std::vector<Enum> identifiers,
-                        std::function<void(IDtype, Types...)> f) {
-        m_updateWithID_sequenced(identifiers, f,
-                                 std::index_sequence_for<Types...>{});
+                        std::function<void(ID_t, Types...)> f, size_t start,
+                        size_t end) 
+    {
+        m_updateWithID_sequenced(
+            identifiers, f, std::index_sequence_for<Types...>{}, start, end);
     }
 
+protected:
+    typedef typename Group<Enum>::HashSize HashSize;
+    ComponentGroup(std::vector<HashSize> types_stored,
+                   std::vector<Enum> variables)
+        : Group<Enum>(types_stored, variables) {}
+
 public:
-    const std::unordered_map<IDtype, size_t>& getEntityIDToIndexMap() const {
+    using Group<Enum>::size;
+    using Group<Enum>::get;
+    using Group<Enum>::update;
+    using Group<Enum>::updateWithIndex;
+    using Group<Enum>::getBuffers;
+
+    const std::unordered_map<ID_t, size_t>& getEntityIDToIndexMap() const {
         return m_entityID_to_index_map;
     }
     typedef std::unique_ptr<ComponentGroup> pointer;
     template <class T, class... Rest>
-    void push_back(IDtype entityid, T v, Rest... vals) {
+    void push_back(ID_t entityid, T v, Rest... vals) {
         m_entityID_to_index_map.insert_or_assign(entityid, this->size());
         m_entityID_list.push_back(entityid);
         Group<Enum>::push_back(v, vals...);
@@ -53,9 +62,9 @@ public:
         this->swap(index, this->size() - 1);
         m_entityID_to_index_map.erase(m_entityID_list.back());
         m_entityID_list.pop_back();
-        Group<Enum>::pop_back(index);
+        Group<Enum>::pop_back();
     }
-    void eraseByID(IDtype id) {
+    void eraseByID(ID_t id) {
         auto index = m_entityID_to_index_map.at(id);
         erase(index);
     }
@@ -66,7 +75,7 @@ public:
     }
     template <class T>
     inline std::optional<std::reference_wrapper<T>> getByID(Enum variable,
-                                                            IDtype id) {
+                                                            ID_t id) {
         auto itr = m_entityID_to_index_map.find(id);
         if (itr == m_entityID_to_index_map.end()) {
             return {};
@@ -82,8 +91,15 @@ public:
         }
     }
     template <class Func>
+    void updateWithID(std::vector<Enum> identifiers, Func f, size_t start,
+                      size_t end) 
+    {
+        m_updateWithID(identifiers, std::function(std::forward<Func>(f)), start,
+                       end);
+    }
+    template <class Func>
     void updateWithID(std::vector<Enum> identifiers, Func f) {
-        m_updateWithID(identifiers, std::function(std::forward<Func>(f)));
+        updateWithID(identifiers, f, 0, size());
     }
 
     ComponentGroup(const ComponentGroup&) = delete;
@@ -135,14 +151,13 @@ void updateMatchingAny_sequenced(size_t intersection_size,
     }
 }
 template <class... Enum, class... Types>
-void updateMatching(size_t intersection_size,
-                              ComponentGroup<Enum>&... groups,
-                              std::vector<Enum>... identificators,
-                              std::function<void(Types...)> update_func) 
+void updateMatching(size_t intersection_size, ComponentGroup<Enum>&... groups,
+                    std::vector<Enum>... identificators,
+                    std::function<void(Types...)> update_func) 
 {
-    updateMatchingAny_sequenced<Enum...>(
-        intersection_size, update_func, std::index_sequence_for<Types...>{},
-        groups..., identificators...);
+    updateMatchingAny_sequenced<Enum...>(intersection_size, update_func,
+                                         std::index_sequence_for<Types...>{},
+                                         groups..., identificators...);
 }
 }; // namespace helper
 
@@ -150,13 +165,14 @@ template <class Enum>
 template <class... Types, class IntSeqT, IntSeqT... Ints>
 void ComponentGroup<Enum>::m_updateWithID_sequenced(
     std::vector<Enum> identifiers,
-    std::function<void(IDtype, Types...)> update_func,
-    std::integer_sequence<IntSeqT, Ints...> int_seq) {
+    std::function<void(ID_t, Types...)> update_func,
+    std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end) 
+{
     std::vector<Buffer*> buffers = this->getBuffers(identifiers);
 
     void* pointers[] = {
         (buffers[Ints]->template getData<base_type<Types>>().data())...};
-    for (size_t i = 0; i < this->size(); i++) {
+    for (size_t i = start; i < std::min(end, size()); i++) {
         update_func(m_entityID_list[i], (reinterpret_cast<base_type<Types>*>(
                                             pointers[Ints]))[i]...);
     }
@@ -164,7 +180,8 @@ void ComponentGroup<Enum>::m_updateWithID_sequenced(
 
 template <class... Enum, class Func>
 void updateMatching(ComponentGroup<Enum>&... groups,
-                       std::vector<Enum>... identificators, Func update_func) {
+                    std::vector<Enum>... identificators, Func update_func) 
+{
     auto intersection =
         (helper::MapToSet(groups.getEntityIDToIndexMap()) ^ ...);
 

@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include "core/component_group.hpp"
 #include "core/entity.hpp"
+#include "debug/log.hpp"
 using namespace epi;
 
 enum class Player {
@@ -22,9 +23,9 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
     comp_group->push_back<float, float, std::string>(Entities::create(), 100.f, 1.f, "first_player");
     comp_group->push_back<float, float, std::string>(Entities::create(), 0.f, 10.f, "second_player");
     comp_group->push_back<float, float, std::string>(Entities::create(), 33.f, 5.f,  "third_player");
-    std::vector<Entities::IDtype> ids_to_delete;
+    std::vector<Entities::ID_t> ids_to_delete;
     comp_group->updateWithID({Player::HP, Player::Name},
-        [&](Entities::IDtype id, float hp, std::string name) {
+        [&](Entities::ID_t id, float hp, std::string name) {
             if(hp == 0) {
                 ids_to_delete.push_back(id);
             }
@@ -33,7 +34,7 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
         comp_group->eraseByID(i);
     }
     comp_group->updateWithID({Player::Name, Player::HP},
-        [&](Entities::IDtype id, std::string name, float hp) {
+        [&](Entities::ID_t id, std::string name, float hp) {
             ASSERT_NE(hp, 0.f);
         });
 }

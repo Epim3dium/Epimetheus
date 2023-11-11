@@ -2,6 +2,8 @@
 #define EPI_ENTITY_HPP
 #include <_types/_uint64_t.h>
 #include <vector>
+#include "component_group.hpp"
+
 namespace epi {
 
 template<class Enum>
@@ -12,16 +14,16 @@ enum class eEntity {
     parentID_EntityID,
     children_vectorEntityID,
 };
-class Entities {
+class Entities : public ComponentGroup<eEntity> {
 public:
-    typedef uint64_t IDtype;
-    typedef std::vector<IDtype> ChildContainer;
+    typedef uint64_t ID_t;
+    typedef std::vector<ID_t> ChildContainer;
 private:
-    static IDtype m_getNewID();
+    static ID_t m_getNewID();
 public:
-    static ComponentGroup<eEntity>& group();
+    static ComponentGroup<eEntity>& get();
     //returns EntityID of entity created
-    static IDtype create(IDtype parent = 0);
+    static ID_t create(ID_t parent = 0);
 };
 
 }

@@ -1,5 +1,6 @@
 #include "app.hpp"
 #include "SFML/Window/Event.hpp"
+#include "utils/time.hpp"
 using namespace epi;
 
 void App::run() {
@@ -15,6 +16,7 @@ void App::run() {
                 event_handler.process(event);
             }
         }
+        Time::update();
 
         this->onUpdate();
         m_window.clear(sf::Color::Black);

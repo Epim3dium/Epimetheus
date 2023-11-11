@@ -84,7 +84,7 @@ public:
 class ThreadPool {
     uint32_t            m_thread_count = 0;
     TaskQueue           m_queue;
-    std::vector<Worker> m_workers;
+    std::vector<std::unique_ptr<Worker>> m_workers;
 public:
 
     explicit ThreadPool(uint32_t thread_count = std::thread::hardware_concurrency())
@@ -92,14 +92,14 @@ public:
     {
         m_workers.reserve(thread_count);
         for (uint32_t i{thread_count}; i--;) {
-            m_workers.emplace_back(m_queue, static_cast<uint32_t>(m_workers.size()));
+            m_workers.emplace_back(std::make_unique<Worker>(m_queue, static_cast<uint32_t>(m_workers.size())));
         }
     }
 
     ~ThreadPool()
     {
-        for (Worker& worker : m_workers) {
-            worker.stop();
+        for (auto& worker : m_workers) {
+            worker.get()->stop();
         }
     }
 
