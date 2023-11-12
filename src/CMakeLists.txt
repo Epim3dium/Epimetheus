@@ -32,6 +32,7 @@ set(TEST_FILES
     main.cpp
     tests/group_test.cpp
     tests/component_group_test.cpp
+    tests/entity_test.cpp
 )
 
 add_executable(epimetheus

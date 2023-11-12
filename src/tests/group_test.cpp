@@ -210,7 +210,7 @@ TEST(GroupTest, GroupBenchmark) {
     }
     ankerl::nanobench::Bench b;
     b.title("Cluster Processing")
-        .minEpochIterations(50U)
+        .minEpochIterations(100U)
         .relative(true)
         .performanceCounters(true);
 
