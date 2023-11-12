@@ -1,5 +1,5 @@
 #include "entity.hpp"
-#include "core/component_group.hpp"
+#include "scene/component_group.hpp"
 namespace epi {
 
 uint64_t Entities::m_getNewID() {

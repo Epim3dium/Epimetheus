@@ -1,7 +1,7 @@
 
 #include <gtest/gtest.h>
-#include "core/component_group.hpp"
-#include "core/entity.hpp"
+#include "scene/component_group.hpp"
+#include "scene/entity.hpp"
 #include "debug/log.hpp"
 using namespace epi;
 

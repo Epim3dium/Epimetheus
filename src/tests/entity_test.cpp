@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "core/entity.hpp"
+#include "scene/entity.hpp"
 #include "debug/log.hpp"
 using namespace epi;
 

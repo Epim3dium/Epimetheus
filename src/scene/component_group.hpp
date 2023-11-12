@@ -1,7 +1,7 @@
 #ifndef EPI_COMPONENT_GROUP_HPP
 #define EPI_COMPONENT_GROUP_HPP
-#include "group.hpp"
-#include "utils/set.hpp"
+#include "templates/group.hpp"
+#include "templates/set.hpp"
 #include <set>
 
 namespace epi {

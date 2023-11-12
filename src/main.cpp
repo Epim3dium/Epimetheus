@@ -2,8 +2,8 @@
 #include <thread>
 #include <SFML/Graphics.hpp>
 
-#include "core/group.hpp"
-#include "core/component_group.hpp"
+#include "templates/group.hpp"
+#include "scene/component_group.hpp"
 #include "timer.h"
 
 

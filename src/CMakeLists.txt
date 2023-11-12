@@ -6,7 +6,7 @@ set(SOURCE_FILES
 
     debug/log.cpp
 
-    core/entity.cpp
+    scene/entity.cpp
 )
 set(HEADER_FILES
     multithreading/thread_pool.hpp
@@ -17,13 +17,14 @@ set(HEADER_FILES
     io/app.hpp
     io/event_handler.hpp
 
-    core/buffer.hpp
-    core/group.hpp
-    core/component_group.hpp
-    core/entity.hpp
+    templates/buffer.hpp
+    templates/group.hpp
 
-    utils/set.hpp
-    utils/stack_linked_list.hpp
+    scene/component_group.hpp
+    scene/entity.hpp
+
+    templates/set.hpp
+    templates/stack_linked_list.hpp
 
     debug/log.hpp
     debug/debug.hpp

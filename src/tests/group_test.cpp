@@ -3,7 +3,7 @@
 #include <thread>
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
-#include "core/group.hpp"
+#include "templates/group.hpp"
 #include "RNG.h"
 
 using namespace epi;
