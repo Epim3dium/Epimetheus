@@ -29,9 +29,20 @@ void DebugShapes::create(Entities::ID_t parent, std::vector<sf::Vector2f> points
     for(int i = 0; i < points.size(); i++) {
         result.setPoint(i, points[i]);
     }
-    result.setFillColor(color);
+    result.setOutlineThickness(1.f);
+    result.setOutlineColor(color);
+    result.setFillColor(sf::Color::Transparent);
 
     m_group->push_back(parent, result);
+}
+void DebugShapes::createCircle(Entities::ID_t parent, float radius,
+            sf::Color color, size_t vert_count) 
+{
+    std::vector<sf::Vector2f> points;
+    for(float x = 0.f; x < EPI_PI * 2.f; x += EPI_PI * 2.f / vert_count) {
+        points.push_back(rotate(sf::Vector2f(radius, 0.f), x));
+    }
+    create(parent, points, color);
 }
 void DebugShapes::erase(Entities::ID_t id) {
     m_group->eraseByID(id);

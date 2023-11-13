@@ -25,3 +25,9 @@ float epi::angle(sf::Vector2f pivot, sf::Vector2f a, sf::Vector2f b) {
     return atan2(b.y - pivot.y, b.x - pivot.x) -
            atan2(a.y - pivot.y, a.x - pivot.x);
 }
+sf::Vector2f epi::rotate(sf::Vector2f vec, float angle) {
+    return { 
+        cosf(angle) * vec.x - sinf(angle) * vec.y, 
+        sinf(angle) * vec.x + cosf(angle) * vec.y, 
+    };
+}

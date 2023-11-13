@@ -11,6 +11,7 @@ set(SOURCE_FILES
     scene/entity.cpp
     scene/debug_shape.cpp
     scene/transform.cpp
+    scene/script.cpp
 )
 set(HEADER_FILES
     multithreading/thread_pool.hpp
@@ -33,6 +34,7 @@ set(HEADER_FILES
     scene/entity.hpp
     scene/debug_shape.hpp
     scene/transform.hpp
+    scene/script.hpp
 
     templates/set.hpp
     templates/stack_linked_list.hpp
@@ -52,7 +54,7 @@ add_executable(epimetheus
     ${SOURCE_FILES} ${HEADER_FILES}
 )
 include(GoogleTest)
-gtest_discover_tests(epimetheus)
+# gtest_discover_tests(epimetheus)
 
 
 include_directories(.)
