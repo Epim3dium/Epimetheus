@@ -13,6 +13,7 @@ enum class Player {
 
 TEST(ComponentGroupTest, PushingUpdatingErasing) {
     ComponentGroup<Player>::pointer comp_group;
+    Entities Entities;
     {
         ComponentGroup<Player>::Factory fac;
         fac.add<float>(Player::HP );
@@ -20,9 +21,9 @@ TEST(ComponentGroupTest, PushingUpdatingErasing) {
         fac.add<std::string>(Player::Name );
         comp_group = fac.create();
     }
-    comp_group->push_back<float, float, std::string>(Entities::create(), 100.f, 1.f, "first_player");
-    comp_group->push_back<float, float, std::string>(Entities::create(), 0.f, 10.f, "second_player");
-    comp_group->push_back<float, float, std::string>(Entities::create(), 33.f, 5.f,  "third_player");
+    comp_group->push_back<float, float, std::string>(Entities.create(), 100.f, 1.f, "first_player");
+    comp_group->push_back<float, float, std::string>(Entities.create(), 0.f, 10.f, "second_player");
+    comp_group->push_back<float, float, std::string>(Entities.create(), 33.f, 5.f,  "third_player");
     std::vector<Entities::ID_t> ids_to_delete;
     comp_group->updateWithID({Player::HP, Player::Name},
         [&](Entities::ID_t id, float hp, std::string name) {
@@ -62,11 +63,12 @@ TEST(ComponentGroupTest, UpdateMatching) {
         fac.add<std::string>(Collider::StringMaterial);
         collider_group = fac.create();
     }
+    Entities Entities;
 
-    auto player   = Entities::create();
-    auto platform = Entities::create();
-    auto trigger  = Entities::create();
-    auto enemy    = Entities::create();
+    auto player   = Entities.create();
+    auto platform = Entities.create();
+    auto trigger  = Entities.create();
+    auto enemy    = Entities.create();
 
     rigidbody_group->push_back(player, 100.f, 100.f);
     rigidbody_group->push_back(platform, 0.f, 0.f);

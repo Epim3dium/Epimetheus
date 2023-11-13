@@ -42,6 +42,9 @@ public:
     using Group<Enum>::updateWithIndex;
     using Group<Enum>::getBuffers;
 
+    bool contains(ID_t id) const {
+        return m_entityID_to_index_map.contains(id);
+    }
     const std::unordered_map<ID_t, size_t>& getEntityIDToIndexMap() const {
         return m_entityID_to_index_map;
     }

@@ -18,23 +18,29 @@ class Entities {
 public:
     typedef uint64_t ID_t;
     typedef std::vector<ID_t> ChildContainer;
-private:
-    static ComponentGroup<eEntity>::pointer m_group;
 
+private:
+    ComponentGroup<eEntity>::pointer m_group;
     static ID_t m_getNewID();
-    Entities() {}
+
 public:
-    static void update();
+    void update();
 
     template <class T>
-    static inline std::optional<std::reference_wrapper<T>>
-    getByID(eEntity variable, ID_t id) {
+    inline std::optional<std::reference_wrapper<T>> getByID(eEntity variable,
+                                                            ID_t id) {
         return std::move(m_group->getByID<T>(variable, id));
     }
 
     // returns EntityID of entity created
-    static ID_t create(ID_t parent = 0);
-    static void erase(ID_t id);
+    ID_t create(ID_t parent = 0);
+    void erase(ID_t id);
+
+    Entities()
+        : m_group(ComponentGroup<eEntity>::Factory()
+                      .add<ID_t>(eEntity::parentID_IDt)
+                      .add<ChildContainer>(eEntity::children_chdcontainer)
+                      .create()) {}
 };
 
 } // namespace epi

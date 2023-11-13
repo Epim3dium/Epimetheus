@@ -6,13 +6,22 @@ set(SOURCE_FILES
 
     debug/log.cpp
 
+    math/math_func.cpp
+
     scene/entity.cpp
+    scene/debug_shape.cpp
+    scene/transform.cpp
 )
 set(HEADER_FILES
     multithreading/thread_pool.hpp
 
     memory/pool_allocator.hpp
     memory/allocator.hpp
+
+    math/math_func.hpp
+    math/math_defs.hpp
+    math/math.hpp
+
 
     io/app.hpp
     io/event_handler.hpp
@@ -22,6 +31,8 @@ set(HEADER_FILES
 
     scene/component_group.hpp
     scene/entity.hpp
+    scene/debug_shape.hpp
+    scene/transform.hpp
 
     templates/set.hpp
     templates/stack_linked_list.hpp

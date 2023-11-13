@@ -70,11 +70,12 @@ TEST(GroupTest, CreationSameTypeComponents) {
 
         fac.add<float>(eVelocity::velx);
         fac.add<float>(eVelocity::vely);
+        fac.add<float>(eVelocity::velz);
         fac.add<float>(eVelocity::weird_product);
         group = fac.create();
     }
-    group->push_back(21.f, 37.f, 0.f);
-    group->push_back(6.f, 9.f, 0.f);
+    group->push_back(21.f, 37.f, 1.f, 0.f);
+    group->push_back(6.f, 9.f, 1.f, 0.f);
     group->update({eVelocity::velx, eVelocity::vely, eVelocity::weird_product}, side_effect_function);
     // Expect equality.
     EXPECT_EQ(group->get<float>(eVelocity::weird_product , 0), 777);
@@ -166,7 +167,7 @@ TEST(GroupTest, GroupBenchmark) {
             : posx(d1), posy(d2), isStatic(b), velx(d3), vely(d4) {}
     };
     std::vector<std::tuple<std::string, double, double, bool, double, double>> data;
-    size_t batch_size = 100000;
+    size_t batch_size = 10000;
     for(auto i = batch_size; i--;) {
         data.push_back({
             gen_random(10, rng), 

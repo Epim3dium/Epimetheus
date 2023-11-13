@@ -111,9 +111,8 @@ public:
     }
     template <class T>
     T& get(Enum variable, size_t index) {
-        auto itr = m_buffer_index_list.find(variable);
-        assert(itr != m_buffer_index_list.end());
-        return m_buffers[itr->second].template get<T>(index);
+        auto idx = m_getBufferIdxOfType(variable);
+        return m_buffers[idx].template get<T>(index);
     }
 
     template <class Func>
