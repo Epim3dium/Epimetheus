@@ -16,9 +16,9 @@ template <typename T>
 using base_type =
     typename std::remove_cv<typename std::remove_reference<T>::type>::type;
 
-template <class Enum>
 class Group {
-    std::unordered_map<Enum, size_t> m_buffer_index_list;
+    typedef size_t hash_t ;
+    std::unordered_map<hash_t, size_t> m_buffer_index_list;
     std::vector<Buffer> m_buffers;
 
 protected:
@@ -29,11 +29,11 @@ protected:
     size_t m_var_count;
     size_t m_instances;
 
-    Group(std::span<HashSize> types_stored, std::span<Enum> variables)
+    Group(std::span<HashSize> types_stored)
         : m_var_count(types_stored.size()) {
         size_t idx = 0;
         for (auto [hash, size] : types_stored) {
-            m_buffer_index_list.insert({variables[idx], idx++});
+            m_buffer_index_list.insert({hash.hash_code(), idx++});
             m_buffers.push_back(
                 Buffer(hash, size, EPI_GROUP_MAX_ELEMENT_COUNT));
         }
@@ -47,35 +47,23 @@ private:
         m_push_back(buf_index, vals...);
     }
 
-    size_t m_getBufferIdxOfType(Enum info) {
-        auto itr = m_buffer_index_list.find(info);
+    template<class T>
+    size_t m_getBufferIdxOfType() {
+        auto itr = m_buffer_index_list.find(typeid(T).hash_code());
         assert(itr != m_buffer_index_list.end());
         return itr->second;
     }
-    template <class... Types, class IntSeqT, IntSeqT... Ints>
-    void m_updateWithIndex_sequenced(std::vector<Enum> identifiers,
-                          std::function<void(size_t, Types...)>&& update_func,
-                          std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end);
 
-    template <class... Types, class IntSeqT, IntSeqT... Ints>
-    void m_update_sequenced(std::vector<Enum> identifiers,
-                          std::function<void(Types...)>&& update_func,
-                          std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end);
-
-    template <class... Types>
-    void m_update(std::vector<Enum> identifiers,
-                  std::function<void(Types...)>&& update_func, size_t start, size_t end) 
-    {
-        m_update_sequenced<Types...>(identifiers, std::move(update_func),
-                                   std::index_sequence_for<Types...>{}, start, end);
+protected:
+    template<class ...Types>
+    std::vector<Buffer*> getBuffers() {
+        std::vector<size_t> indexes = {m_getBufferIdxOfType<Types>()...};
+        std::vector<Buffer*> ptrs;
+        for(auto i : indexes) {
+            ptrs.push_back(&m_buffers[i]);
+        }
+        return ptrs;
     }
-    template <class... Types>
-    void m_updateWithIndex(std::vector<Enum> identifiers,
-                  std::function<void(size_t, Types...)>&& update_func, size_t start, size_t end) {
-        m_updateWithIndex_sequenced<Types...>(identifiers, std::move(update_func),
-                                   std::index_sequence_for<Types...>{}, start, end);
-    }
-
 public:
     typedef std::unique_ptr<Group> pointer;
     size_t size() const { return m_instances; }
@@ -110,21 +98,10 @@ public:
             b.clear();
     }
     template <class T>
-    T& get(Enum variable, size_t index) {
-        auto idx = m_getBufferIdxOfType(variable);
+    T& get(size_t index) {
+        auto idx = m_getBufferIdxOfType<T>();
         return m_buffers[idx].template get<T>(index);
     }
-
-    template <class Func>
-    void update(std::vector<Enum> identifiers, Func&& f);
-    template <class Func>
-    void update(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end);
-
-    //where first argument in function f must be size_t (index)
-    template <class Func>
-    void updateWithIndex(std::vector<Enum> identifiers, Func&& f);
-    template <class Func>
-    void updateWithIndex(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end);
 
     Group(const Group&) = delete;
     Group(Group&&) = delete;
@@ -133,82 +110,57 @@ public:
 
     virtual ~Group() {}
 
-    std::vector<Buffer*> getBuffers(std::vector<Enum> identifiers) {
-        std::vector<Buffer*> ptrs;
-        for (int i = 0; i < identifiers.size(); i++) {
-            auto id = identifiers[i];
-            auto buf_index = m_getBufferIdxOfType(id);
-            ptrs.push_back(&m_buffers[buf_index]);
-        }
-        return ptrs;
-    }
+    template<class ...Types>
+    class Form;
+
+    template<class ...Types>
+    Form<Types...> mold();
+
     class Factory;
 };
-template <class Enum>
-template <class... Types, class IntSeqT, IntSeqT... Ints>
-void Group<Enum>::m_update_sequenced(
-    std::vector<Enum> identifiers, std::function<void(Types...)>&& update_func,
-    std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end) 
-{
-    std::vector<Buffer*> buffers = getBuffers(identifiers);
 
-    void* pointers[] = {
-        (buffers[Ints]->template getData<base_type<Types>>().data())...};
-    for (size_t i = start; i < std::min(end, size()); i++) {
-        update_func(
-            (reinterpret_cast<base_type<Types>*>(pointers[Ints]))[i]...);
+template<class ...Types>
+Group::Form<Types...> Group::mold() {
+    return Form<Types...>(getBuffers<Types...>(), this->size());
+}
+template<class ...Types>
+class Group::Form {
+protected:
+    std::vector<Buffer*> m_bufs;
+    Form (std::vector<Buffer*> buffers, size_t size) : m_bufs(buffers), m_size(size) {}
+private:
+    const size_t m_size;
+
+    template<class ...ArgT, size_t... Ints>
+    typename std::enable_if<(std::is_same<base_type<ArgT>, Types>::value && ...), void>::type
+    m_for_each(std::function<void(ArgT...)>&& update_func, std::integer_sequence<size_t, Ints...> int_seq, size_t start, size_t end) {
+        for(size_t i = start; i < std::min(m_size, end); i++) {
+            update_func((reinterpret_cast<Types*>(m_bufs[Ints]->template getData<Types>().data()))[i]...);
+        }
     }
-}
-template <class Enum>
-template <class... Types, class IntSeqT, IntSeqT... Ints>
-void Group<Enum>::m_updateWithIndex_sequenced(
-    std::vector<Enum> identifiers, std::function<void(size_t, Types...)>&& update_func,
-    std::integer_sequence<IntSeqT, Ints...> int_seq, size_t start, size_t end) {
-    std::vector<Buffer*> buffers = getBuffers(identifiers);
-
-    void* pointers[] = {
-        (buffers[Ints]->template getData<base_type<Types>>().data())...};
-    for (size_t i = start; i < std::min(end, size()); i++) {
-        update_func(i,
-            (reinterpret_cast<base_type<Types>*>(pointers[Ints]))[i]...);
+public:
+    size_t size() const {
+        return m_size;
     }
-}
-template <class Enum>
-template <class Func>
-void Group<Enum>::update(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end) {
-    m_update(identifiers, std::function(std::forward<Func>(f)), start, end);
-}
+    template<class Func>
+    void for_each(Func&& update_func, size_t start = 0, size_t end = INFINITY) {
+        m_for_each(std::function(std::forward<Func>(update_func)), std::index_sequence_for<Types...>{}, start, end);
+    }
+    friend Group;
+    
+};
 
-template <class Enum>
-template <class Func>
-void Group<Enum>::update(std::vector<Enum> identifiers, Func&& f) {
-    update(identifiers, f, 0, size());
-}
-template <class Enum>
-template <class Func>
-void Group<Enum>::updateWithIndex(std::vector<Enum> identifiers, Func&& f, size_t start, size_t end) {
-    m_updateWithIndex(identifiers, std::function(std::forward<Func>(f)), start, end);
-}
-template <class Enum>
-template <class Func>
-void Group<Enum>::updateWithIndex(std::vector<Enum> identifiers, Func&& f) {
-    updateWithIndex(identifiers, f, 0, size());
-}
-
-template <class Enum>
-class Group<Enum>::Factory {
+class Group::Factory {
     std::vector<Group::HashSize> m_init_values;
-    std::vector<Enum> m_identifiers;
 
 public:
     template <class T>
-    Group<Enum>::Factory& add(Enum identifier) {
+    Group::Factory& add() {
         m_init_values.push_back({typeid(T), sizeof(T)});
-        m_identifiers.push_back(identifier);
         return *this;
     }
     std::unique_ptr<Group> create() {
-        std::unique_ptr<Group> result{new Group(m_init_values, m_identifiers)};
+        std::unique_ptr<Group> result{new Group(m_init_values)};
         return std::move(result);
     }
 };

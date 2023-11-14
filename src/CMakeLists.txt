@@ -8,10 +8,10 @@ set(SOURCE_FILES
 
     math/math_func.cpp
 
-    scene/entity.cpp
-    scene/debug_shape.cpp
-    scene/transform.cpp
-    scene/script.cpp
+    # scene/entity.cpp
+    # scene/debug_shape.cpp
+    # scene/transform.cpp
+    # scene/script.cpp
 )
 set(HEADER_FILES
     multithreading/thread_pool.hpp
@@ -31,10 +31,10 @@ set(HEADER_FILES
     templates/group.hpp
 
     scene/component_group.hpp
-    scene/entity.hpp
-    scene/debug_shape.hpp
-    scene/transform.hpp
-    scene/script.hpp
+    # scene/entity.hpp
+    # scene/debug_shape.hpp
+    # scene/transform.hpp
+    # scene/script.hpp
 
     templates/set.hpp
     templates/stack_linked_list.hpp
@@ -44,9 +44,9 @@ set(HEADER_FILES
 )
 set(TEST_FILES
     main.cpp
-    tests/group_test.cpp
-    tests/component_group_test.cpp
-    tests/entity_test.cpp
+    # tests/group_test.cpp
+    # tests/component_group_test.cpp
+    # tests/entity_test.cpp
 )
 
 add_executable(epimetheus
