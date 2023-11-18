@@ -51,18 +51,18 @@ public:
     inline void* getPtr() const {
         return mem_block;
     }
-    void clear() {
+    inline void clear() {
         tail = mem_block;
         m_elem_count = 0;
     }
     template<class T>
-    void push_back(T val) {
+    inline void push_back(T val) {
         assert(typeid(T).hash_code() == m_type_hash);
         assert(m_elem_count < m_max_elem_count);
         auto mem = allocate(sizeof(T));
         new (mem)T(val);
     }
-    void swap(size_t idx1, size_t idx2) {
+    inline void swap(size_t idx1, size_t idx2) {
         auto head =(char*)mem_block;
         auto ptr1 = (head + idx1 * m_elem_size);
         auto ptr2 = (head + idx2 * m_elem_size);
@@ -74,7 +74,7 @@ public:
         }
 
     }
-    void pop_back() {
+    inline void pop_back() {
         assert(tail != mem_block);
         char* last = static_cast<char*>(tail);
         last -= m_elem_size;
@@ -82,7 +82,7 @@ public:
         tail = last;
     }
     template<class T>
-    T& get(size_t index) {
+    inline T& get(size_t index) {
         assert(typeid(T).hash_code() == m_type_hash);
         assert(index < m_elem_count && "tried accessing element out of range");
         return static_cast<T*>(mem_block)[index];
