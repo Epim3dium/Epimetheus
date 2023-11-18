@@ -11,6 +11,11 @@ class App {
 protected:
     EventHandler event_handler;
 public:
+    inline auto getMousePos() const {
+        return sf::Mouse::getPosition(m_window);
+    }
+    const size_t width;
+    const size_t height;
     const std::string title;
 
     virtual bool onSetup() { return true; }
@@ -18,7 +23,7 @@ public:
     virtual void onRender(sf::RenderWindow& window) = 0;
     void run();
     App(unsigned int width, unsigned int height, std::string title)
-        : m_window(sf::VideoMode{width, height}, title), title(title) {}
+        : width(width), height(height), m_window(sf::VideoMode{width, height}, title), title(title) {}
 };
 
 };     // namespace epi

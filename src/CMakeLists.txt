@@ -28,9 +28,10 @@ set(HEADER_FILES
     io/event_handler.hpp
 
     templates/buffer.hpp
-    templates/group.hpp
+    templates/component_group.hpp
 
-    scene/component_group.hpp
+    grid.cpp
+
     # scene/entity.hpp
     # scene/debug_shape.hpp
     # scene/transform.hpp
