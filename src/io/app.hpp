@@ -14,6 +14,9 @@ public:
     inline auto getMousePos() const {
         return sf::Mouse::getPosition(m_window);
     }
+    inline auto getSize() const {
+        return m_window.getSize();
+    }
     const size_t width;
     const size_t height;
     const std::string title;

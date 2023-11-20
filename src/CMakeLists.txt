@@ -60,3 +60,8 @@ include(GoogleTest)
 
 include_directories(.)
 include(../cmake/Install.cmake)
+
+add_compile_options(
+    "$<$<CONFIG:RELEASE>:-o3>"
+    "$<$<CONFIG:DEBUG>:-glldb>"
+)

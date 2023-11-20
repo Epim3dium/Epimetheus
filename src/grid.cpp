@@ -11,7 +11,7 @@ RNG rng;
 void updateSand(Grid& g, sf::Vector2i vec) {
     int first_dir = rng.Random() > 0.5f ? 1 : -1;
     for(auto dir : std::vector<sf::Vector2i>{{0, -1}, {first_dir, -1}, {-first_dir, -1}}) {
-        if(g.at(vec + dir).type == eCellType::Air) {
+        if(g.get(vec + dir).type == eCellType::Air) {
             g.swap_at(vec, vec + dir);
             return;
         }
@@ -20,9 +20,9 @@ void updateSand(Grid& g, sf::Vector2i vec) {
 }
 void updateWater(Grid& g, sf::Vector2i vec) {
 }
-const std::unordered_map<eCellType, updateFunc_t> Cell::g_updates = { 
-    {eCellType::Bedrock, nullptr},
-    {eCellType::Air,     nullptr},
-    {eCellType::Sand,    updateSand},
-    {eCellType::Water,   updateWater},
+const updateFunc_t Cell::g_updates[] = { 
+    updateWater,
+    updateWater,
+    updateSand,
+    updateWater,
 };
