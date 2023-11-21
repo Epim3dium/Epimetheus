@@ -19,14 +19,14 @@ struct Particle {
     Particle(vec2f pos, Cell c) : pos(pos), old_pos(pos), force(), cell_info(c) {}
 };
 struct ParticleManager {
-    const size_t width;
-    const size_t height;
+    size_t width;
+    size_t height;
     typedef std::vector<Particle*> BoxT;
 
     std::vector< BoxT> boxes;
     std::vector<std::unique_ptr<Particle>> particles;
 
-    ParticleManager(size_t w, size_t h) :  width(w / Particle::radius), height(h / Particle::radius), boxes(width * height) {
+    ParticleManager(size_t w, size_t h) :  width(w / Particle::radius), height(h / Particle::radius), boxes(w * h / (Particle::radius * Particle::radius)) {
     }
 
     BoxT* boxOF(vec2f pos) {
@@ -65,52 +65,52 @@ struct ParticleManager {
     }
     std::vector<BoxT*> last_boxes;
     void update(float dt, Grid& grid) {
-        // const float iter_count = 8.f;
-        // float delT = dt / iter_count;
-        //
-        // for(int iter = 0; iter < iter_count; iter++) {
-        //     for(int i = 0; i < particles.size(); i++) {
-        //         auto p = particles[i].get();
-        //         p->force += vec2f{0, -100};
-        //         auto offset = p->pos - p->old_pos + p->force / p->mass * delT * delT;
-        //         p->force = {0, 0};
-        //
-        //         p->old_pos = p->pos;
-        //
-        //
-        //         p->pos += offset;
-        //         if(grid.get(p->pos.x, p->pos.y).type != eCellType::Air) {
-        //             grid.set({static_cast<int>(p->old_pos.x), static_cast<int>(p->old_pos.y)}, p->cell_info);
-        //             std::swap(particles[i], particles.back());
-        //             particles.pop_back();
-        //             i--;
-        //             continue;
-        //             // p->pos = p->old_pos;
-        //         }
-        //         processCollision(p, delT);
-        //     }
-        //     for(auto& b : last_boxes)
-        //         b->clear();
-        //     last_boxes.clear();
-        //     for(auto& p : particles) {
-        //         auto* box = boxOF(p->pos);
-        //         if(!box)
-        //             continue;
-        //         box->push_back(p.get());
-        //         last_boxes.push_back(box);
-        //     }
-        // }
+        const float iter_count = 8.f;
+        float delT = dt / iter_count;
+        
+        for(int iter = 0; iter < iter_count; iter++) {
+            for(int i = 0; i < particles.size(); i++) {
+                auto p = particles[i].get();
+                p->force += vec2f{0, -100};
+                auto offset = p->pos - p->old_pos + p->force / p->mass * delT * delT;
+                p->force = {0, 0};
+        
+                p->old_pos = p->pos;
+        
+        
+                p->pos += offset;
+                if(grid.get(p->pos.x, p->pos.y).type != eCellType::Air) {
+                    grid.set({static_cast<int>(p->old_pos.x), static_cast<int>(p->old_pos.y)}, p->cell_info);
+                    std::swap(particles[i], particles.back());
+                    particles.pop_back();
+                    i--;
+                    continue;
+                    // p->pos = p->old_pos;
+                }
+                processCollision(p, delT);
+            }
+            for(auto& b : last_boxes)
+                b->clear();
+            last_boxes.clear();
+            for(auto& p : particles) {
+                auto* box = boxOF(p->pos);
+                if(!box)
+                    continue;
+                box->push_back(p.get());
+                last_boxes.push_back(box);
+            }
+        }
     }
     void render(sf::RenderTarget& target) {
-        // sf::VertexArray arr;
-        // arr.setPrimitiveType(sf::PrimitiveType::Points);
-        // for(int i = 0; i < particles.size(); i++) {
-        //     sf::Vertex v;
-        //     v.position = particles[i]->pos;
-        //     v.color = particles[i]->cell_info.color;
-        //     arr.append(v);
-        // }
-        // target.draw(arr);
+        sf::VertexArray arr;
+        arr.setPrimitiveType(sf::PrimitiveType::Points);
+        for(int i = 0; i < particles.size(); i++) {
+            sf::Vertex v;
+            v.position = particles[i]->pos;
+            v.color = particles[i]->cell_info.color;
+            arr.append(v);
+        }
+        target.draw(arr);
 
     }
 };

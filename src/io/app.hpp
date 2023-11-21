@@ -17,6 +17,7 @@ public:
     inline auto getSize() const {
         return m_window.getSize();
     }
+    virtual ~App() {}
     const size_t width;
     const size_t height;
     const std::string title;

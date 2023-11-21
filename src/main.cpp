@@ -67,7 +67,7 @@ public:
                             canSpawn = false;
                     }
             if(canSpawn)
-                particle_manager.add(std::unique_ptr<Particle>{new Particle{vec2f(mouse_pos.x, mouse_pos.y ), Cell(eCellType::Sand)}});
+                particle_manager.add(std::move(std::unique_ptr<Particle>{new Particle{vec2f(mouse_pos.x, mouse_pos.y ), Cell(eCellType::Sand)}}));
         }
         grid.update(epi::Time::deltaTime());
         particle_manager.update(Time::deltaTime(), grid);
@@ -100,7 +100,6 @@ int main(int argc, char** argv)
     if((err = RUN_ALL_TESTS())) {
         return err;
     }
-    Demo d(1024, 1024);
+    Demo d(1 << 10, 1 << 10);
     d.run();
-    std::cerr << "stopped";
 }
