@@ -53,7 +53,7 @@ public:
         assert(w == h);
         img.create(w, h);
     }
-    void update() {
+    void update(float delT) {
         std::swap(segments[0], segments[1]);
         for(auto& t : segments[0]) {
             t.min = {0xffffff, 0xffffff};
@@ -101,22 +101,13 @@ public:
         set(v1, get(v2));
         set(v2, tmp);
     }
-    float pixelSize(const sf::Vector2u size) const {
-        float scalar = 1.f;
-        if (size.x < size.y) {
-            scalar = static_cast<float>(size.x) / width;
-        } else {
-            scalar = static_cast<float>(size.y) / height;
-        }
-        return scalar;
-    }
     void render(sf::RenderTarget& target) {
         for(auto& t : segments[1]) {
             if(t.max.x == -1)
                 continue;
             for (int y = t.min.y - 1; y <= t.max.y + 1; y++) {
                 for (int x = t.min.x - 1; x <= t.max.x + 1; x++) {
-                    img.setPixel(x, height - y - 1, get(x, y).color);
+                    img.setPixel(x, y, get(x, y).color);
                 }
             }
         }
@@ -124,8 +115,6 @@ public:
         tex.loadFromImage(img);
         sf::Sprite spr;
         spr.setPosition(0, 0);
-        auto px_size = pixelSize(target.getSize());
-        spr.setScale(px_size, px_size);
         spr.setTexture(tex);
         target.draw(spr);
     }

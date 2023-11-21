@@ -31,3 +31,6 @@ sf::Vector2f epi::rotate(sf::Vector2f vec, float angle) {
         sinf(angle) * vec.x + cosf(angle) * vec.y, 
     };
 }
+float epi::length(sf::Vector2f v) {
+    return sqrt(v.x * v.x + v.y * v.y);
+}

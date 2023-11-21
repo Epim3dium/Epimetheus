@@ -18,11 +18,21 @@ void updateSand(Grid& g, sf::Vector2i vec) {
     }
     return;
 }
+void updateNone(Grid& g, sf::Vector2i vec) {
+}
 void updateWater(Grid& g, sf::Vector2i vec) {
+    int first_dir = rng.Random() > 0.5f ? 1 : -1;
+    for(auto dir : std::vector<sf::Vector2i>{{0, -1}, {first_dir, -1}, {-first_dir, -1}, {first_dir, 0}, {-first_dir, 0}}) {
+        if(g.get(vec + dir).type == eCellType::Air) {
+            g.swap_at(vec, vec + dir);
+            return;
+        }
+    }
+    return;
 }
 const updateFunc_t Cell::g_updates[] = { 
-    updateWater,
-    updateWater,
+    updateNone,
+    updateNone,
     updateSand,
     updateWater,
 };

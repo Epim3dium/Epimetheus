@@ -1,3 +1,4 @@
+#pragma once
 #include "SFML/Graphics/Color.hpp"
 #include "SFML/System/Vector2.hpp"
 #include <unordered_map>
