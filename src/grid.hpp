@@ -19,7 +19,8 @@ class Grid {
 public:
     sf::Image img;
     std::vector<Cell> world;
-    std::vector<AABB> segments[2];
+    std::vector<AABB> current_segments;
+    std::vector<AABB> last_segments;
     const size_t width;
     const size_t height;
     size_t last_tick_updated = 1;
@@ -35,7 +36,7 @@ public:
     Grid(size_t w, size_t h)
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
     {
-        segments[0] = std::vector<AABB>(segmentsWidth() * segmentsHeight());
+        current_segments = std::vector<AABB>(segmentsWidth() * segmentsHeight());
         for(int x = 0; x < width; x++) {
             for(int y = 0; y < height; y++) {
                 if(x == 0 || y == 0 || x == width - 1 || y == height - 1) {
@@ -45,17 +46,17 @@ public:
         }
         for(int y = 0; y < segmentsHeight(); y++) {
             for(int x = 0; x < segmentsWidth(); x++) {
-                segments[0][y * segmentsWidth() + x].max = {-1, -1};
-                segments[0][y * segmentsWidth() + x].min = {-1, -1};
+                current_segments[y * segmentsWidth() + x].max = {-1, -1};
+                current_segments[y * segmentsWidth() + x].min = {-1, -1};
             }
         }
-        segments[1] = segments[0];
+        last_segments = current_segments;
         assert(w == h);
-        img.create(w, h);
+        img.create(w, h, Cell(eCellType::Air).color);
     }
     void update(float delT) {
-        std::swap(segments[0], segments[1]);
-        for(auto& t : segments[0]) {
+        std::swap(current_segments, last_segments);
+        for(auto& t : current_segments) {
             t.min = {0xffffff, 0xffffff};
             t.max = {-1, -1};
         }
@@ -63,7 +64,7 @@ public:
         auto rng = std::default_random_engine{};
         //std::shuffle(segments[1].begin(), segments[1].end(), rng);
 
-        for(auto& t : segments[1]) {
+        for(auto& t : last_segments) {
             if(t.max.x == -1) {
                 continue;
             }
@@ -92,7 +93,7 @@ public:
     void set(sf::Vector2i v, Cell c) { 
         int base_x = v.x / SEGMENT_SIZE;
         int base_y = v.y / SEGMENT_SIZE;
-        segments[0][base_y * segmentsWidth() + base_x].expandToContain(v);
+        current_segments[base_y * segmentsWidth() + base_x].expandToContain(v);
 
         world[m_idx(v.x, v.y)] = c; 
     }
@@ -102,7 +103,7 @@ public:
         set(v2, tmp);
     }
     void render(sf::RenderTarget& target) {
-        for(auto& t : segments[1]) {
+        for(auto& t : last_segments) {
             if(t.max.x == -1)
                 continue;
             for (int y = t.min.y - 1; y <= t.max.y + 1; y++) {

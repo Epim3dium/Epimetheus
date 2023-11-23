@@ -39,7 +39,7 @@ public:
     }
     void onUpdate() override {
         int brush_size = 10;
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::X)) {
             auto mouse_pos = getMousePos();
             auto px_size = pixelSize(getSize());
             mouse_pos.x /= px_size;
@@ -53,23 +53,36 @@ public:
                 grid.set({(int)mouse_pos.x + i , static_cast<int>(grid.height - (int)mouse_pos.y - 1)}, c);
             }
         }
+        static vec2i last_mouse_pos = getMousePos();
         if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-            auto mouse_pos = getMousePos();
+            vec2f mouse_pos = (vec2f)getMousePos();
             auto px_size = pixelSize(getSize());
             mouse_pos.x /= px_size;
             mouse_pos.y /= px_size;
             mouse_pos.y = grid.height - mouse_pos.y - 1;
-            bool canSpawn = true;
-            for(auto dy : {0, -1, 1})
-                for(auto dx : {0, -1, 1})
-                    for(auto p : *particle_manager.boxOF((vec2f)mouse_pos + vec2f(dx, dy))) {
-                        if(length(p->pos - (vec2f)mouse_pos) < Particle::radius * 2.f)
+            const int spawn_size = 10;
+            auto force = vec2f(getMousePos() - last_mouse_pos) * 10000.f;
+            for(float y = mouse_pos.y; y < mouse_pos.y + spawn_size; y += Particle::radius + 0.01f) {
+                for(float x = mouse_pos.x; x < mouse_pos.x + spawn_size; x += Particle::radius + 0.01f) {
+                    auto& box = *particle_manager.boxOf({x, y});
+                    auto adj = particle_manager.getAdjacentBoxes(box);
+                    bool canSpawn = true;
+                    for(auto b : adj) {
+                        if(b->size() != 0) {
                             canSpawn = false;
+                            break;
+                        }
                     }
-            if(canSpawn)
-                particle_manager.add(std::move(std::unique_ptr<Particle>{new Particle{vec2f(mouse_pos.x, mouse_pos.y ), Cell(eCellType::Sand)}}));
+                    if(canSpawn) {
+                        auto p = new Particle{vec2f(x, y ), Cell(eCellType::Water)};
+                        p->acc += vec2f(force.x, -force.y);
+                        particle_manager.add(std::move(std::unique_ptr<Particle>{p}));
+                    }
+                }
+            }
         }
-        grid.update(epi::Time::deltaTime());
+        last_mouse_pos = getMousePos();
+        grid.update(Time::deltaTime());
         particle_manager.update(Time::deltaTime(), grid);
     }
     void onRender(sf::RenderWindow& window) override {
@@ -86,20 +99,18 @@ public:
         ImGui::Begin("options");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
         1000.0/double(ImGui::GetIO().Framerate), double(ImGui::GetIO().Framerate));
+        ImGui::Text("particle count: %zu", particle_manager.particles.size());
         ImGui::End();
     }
     Demo(size_t w, size_t h) : App(w, h, "demo"), grid(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE), particle_manager(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE) {}
+    ~Demo() { std::cerr << "demo destroyed\n"; }
 };
-
 
 int main(int argc, char** argv)
 {
-    Log::ReportingLevel = LogLevel::WARNING;
-    testing::InitGoogleTest(&argc, argv);
-    int err;
-    if((err = RUN_ALL_TESTS())) {
-        return err;
+    {
+        auto d = new Demo(1 << 10, 1 << 10);
+        d->run();
+        delete d;
     }
-    Demo d(1 << 10, 1 << 10);
-    d.run();
 }

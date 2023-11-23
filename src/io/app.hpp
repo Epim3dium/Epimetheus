@@ -17,7 +17,7 @@ public:
     inline auto getSize() const {
         return m_window.getSize();
     }
-    virtual ~App() {}
+    virtual ~App() {std::cerr << "app destroyed\n";}
     const size_t width;
     const size_t height;
     const std::string title;

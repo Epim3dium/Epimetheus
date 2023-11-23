@@ -11,7 +11,7 @@ RNG rng;
 void updateSand(Grid& g, sf::Vector2i vec) {
     int first_dir = rng.Random() > 0.5f ? 1 : -1;
     for(auto dir : std::vector<sf::Vector2i>{{0, -1}, {first_dir, -1}, {-first_dir, -1}}) {
-        if(g.get(vec + dir).type == eCellType::Air) {
+        if(g.get(vec + dir).type != eCellType::Sand && g.get(vec + dir).type != eCellType::Bedrock) {
             g.swap_at(vec, vec + dir);
             return;
         }
