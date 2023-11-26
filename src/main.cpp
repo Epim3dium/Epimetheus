@@ -24,7 +24,6 @@ public:
     Grid grid;
     ParticleManager particle_manager;
     sf::RenderTexture downscaled;
-    ThreadPool tp;
     float pixelSize(const sf::Vector2u size) const {
         float scalar = 1.f;
         if (size.x < size.y) {
@@ -62,35 +61,17 @@ public:
             mouse_pos.y /= px_size;
             mouse_pos.y = grid.height - mouse_pos.y - 1;
             const int spawn_size = 10;
-            static size_t tick_count = 0;
-            tick_count++;
             auto force = vec2f(getMousePos() - last_mouse_pos) * 1000.f;
-            for(float y = mouse_pos.y; y < mouse_pos.y + spawn_size; y += Particle::radius) {
-                for(float x = mouse_pos.x; x < mouse_pos.x + spawn_size; x += Particle::radius) {
-                    auto& box = *particle_manager.boxOf({x, y});
-                    auto adj = particle_manager.getAdjacentBoxes(box);
-                    bool canSpawn = true;
-                    if(box.size() != 0)
-                        canSpawn = false;
-                    for(int i = 0; i < 8; i++) {
-                        if(adj[i]->size() != 0) {
-                            canSpawn = false;
-
-                            break;
-                        }
-                    }
-                    if(canSpawn) {
-                        auto p = new Particle{vec2f(x, y ), Cell(eCellType::Water)};
-                        p->acc += vec2f(force.x, -force.y);
-                        particle_manager.add(std::move(std::unique_ptr<Particle>{p}));
-                        box.push_back(p);
-                    }
+            for(float y = mouse_pos.y; y < mouse_pos.y + spawn_size; y += Particles::radius * 2.f) {
+                for(float x = mouse_pos.x; x < mouse_pos.x + spawn_size; x += Particles::radius * 2.f) {
+                    particle_manager.add({x, y}, Cell(eCellType::Water));
+                    particle_manager.particles.acc.back() += vec2f(force.x, -force.y);
                 }
             }
         }
         last_mouse_pos = getMousePos();
         grid.update(Time::deltaTime());
-        particle_manager.update(Time::deltaTime(), grid, &tp);
+        particle_manager.update(Time::deltaTime(), grid);
     }
     void onRender(sf::RenderWindow& window) override {
         grid.render(downscaled);

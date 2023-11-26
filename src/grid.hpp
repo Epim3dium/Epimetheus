@@ -31,7 +31,13 @@ public:
     inline size_t segmentsHeight() const {
         return height / SEGMENT_SIZE + 1;
     }
-    inline size_t m_idx(int x, int y) const { return y * width + x; }
+    inline size_t m_idx(int x, int y) const { 
+        assert(y < height);
+        assert(x < width);
+        assert(y >= 0);
+        assert(x >= 0);
+        return y * width + x; 
+    }
 
     Grid(size_t w, size_t h)
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
