@@ -10,20 +10,17 @@
 #include "cell.hpp"
 #include "math/math.hpp"
 #include "grid.hpp"
+#include "multithreading/thread_pool.hpp"
+using epi::ThreadPool;
+
 struct Particle {
     vec2f position;
     Cell cell_info;
     vec2f position_old;
     vec2f acc;
     float mass = 1.f;
-    static constexpr float radius = 0.7f;
+    static constexpr float radius = 0.5f;
     Particle(vec2f pos, Cell c) : position(pos), position_old(pos), acc(), cell_info(c) {}
-    void updatePosition(float delT) {
-        vec2f offset = position - position_old;
-        position_old = position;
-        position = position + offset + acc * (delT * delT);
-        acc = vec2f();
-    }
 };
 class ParticleManager {
 public:
@@ -36,41 +33,33 @@ public:
     std::vector<BoxT> boxes;
     std::vector<BoxT*> last_boxes;
     std::vector<std::unique_ptr<Particle>> particles;
+    static constexpr float boxsize = Particle::radius * 2.f;
 
-    ParticleManager(size_t w, size_t h) :  width(w / Particle::radius), height(h / Particle::radius), boxes(w * h / (Particle::radius * Particle::radius)) {
+    ParticleManager(size_t w, size_t h) :  width(w / boxsize), height(h / boxsize), boxes(w * h / (boxsize * boxsize)) {
     }
 
-    std::array<BoxT*, 4U> getAdjacentBoxes(BoxT& box) {
-        std::array<BoxT*, 4U> result;
+    std::array<BoxT*, 8U> getAdjacentBoxes(BoxT& box) {
+        std::array<BoxT*, 8U> result;
 
         size_t index = &box - &boxes.front();
         int y = index / width;
         int x = index - (y * width);
-        result[0] = &boxes[y * width + x + 1];
-        result[1] = &boxes[y * width + x - 1];
-        result[2] = &boxes[(y + 1) * width + x];
-        result[3] = &boxes[(y - 1) * width + x];
+        size_t cur_idx = 0;
+        for(int dy : {1, 0, -1}) {
+            for(int dx : {1, 0, -1}) {
+                if(dy == 0 && dx == 0)
+                    continue;
+                result[cur_idx++] = &boxes[(y + dy) * width + x + dx];
+            }
+        }
+        assert(cur_idx == 8);
 
-        return result;
-    }
-    std::array<BoxT*, 2U> getAdjacentBoxesPositive(BoxT& box) {
-        std::array<BoxT*, 2U> result;
-
-        size_t index = &box - &boxes.front();
-        int y = index / width;
-        int x = index - (y * width);
-        result[0] = &boxes[y * width + x + 1];
-        result[1] = &boxes[(y + 1) * width + x];
-        if(x == width - 1)
-            result[0] = nullptr;
-        if(y == height - 1)
-            result[1] = nullptr;
         return result;
     }
 
     BoxT* boxOf(vec2f pos) {
-        int x = floorf(pos.x / Particle::radius);
-        int y = floorf(pos.y / Particle::radius);
+        int x = floorf(pos.x / boxsize);
+        int y = floorf(pos.y / boxsize);
         if(y >= height || y < 0 || x >= width || x < 0)
             return nullptr;
         return &boxes[y * width + x];
@@ -81,23 +70,24 @@ public:
         if(boxOf(ptr->position))
             boxOf(ptr->position)->push_back(ptr);
     }
-    void handleCollision(Particle& c1, Particle& c2) {
+    bool handleCollision(Particle& c1, Particle& c2) {
         float l = epi::length(c1.position - c2.position);
-        constexpr float min_r = Particle::radius;
-        if(l < min_r * min_r) {
-            vec2f n = (c2.position - c1.position) / l;
-            constexpr float response_coef = 0.75f;
-            float mag = (l - min_r) * 0.5f * response_coef;
+        constexpr float min_r = Particle::radius * 2.f;
+        if(l > min_r) 
+            return false;
+        vec2f n = (c1.position - c2.position) / l;
+        constexpr float response_coef = 0.75f;
+        float mag = (min_r - l) * 0.5f * response_coef;
 
-            const float mass_ratio_1 = c1.radius / (c1.radius + c2.radius);
-            const float mass_ratio_2 = c2.radius / (c1.radius + c2.radius);
+        const float mass_ratio_1 = c1.mass / (c1.mass + c2.mass);
+        const float mass_ratio_2 = c2.mass / (c1.mass + c2.mass);
 
-            c1.position += n * mass_ratio_1 * mag;
-            c2.position += -n* mass_ratio_2 * mag;
-        }
+        c1.position += n * mass_ratio_1 * mag;
+        c2.position += -n* mass_ratio_2 * mag;
+        return true;
     }
     void processCollisionForBox(BoxT& box) {
-        auto adj = getAdjacentBoxesPositive(box);
+        auto adj = getAdjacentBoxes(box);
         for(auto p1 : box) {
             for(auto p2 : box) {
                 if(p1 == p2)
@@ -105,47 +95,47 @@ public:
                 handleCollision(*p1, *p2);
             }
         }
-        if(adj[0])
+        for(auto idx : {0, 1, 2, 3}) {
+            if(!adj[idx])
+                continue;
             for(auto p1 : box) {
-                for(auto p2 : *adj[0]) {
+                for(auto p2 : *adj[idx]) {
                     if(p1 == p2)
                         continue;
                     handleCollision(*p1, *p2);
                 }
             }
-        if(adj[1])
-            for(auto p1 : box) {
-                for(auto p2 : *adj[1]) {
-                    if(p1 == p2)
-                        continue;
-                    handleCollision(*p1, *p2);
-                }
-            }
+        }
     }
     void updatePosition(Particle* p, float delT) {
         auto vel = p->position - p->position_old;
+        auto vel_n = epi::dot(vel, vel) != 0.f ? vel / epi::length(vel) : vec2f();
+        constexpr float drag = 0.05f;
         p->position_old = p->position;
-        p->position += vel + p->acc / p->mass * delT * delT;
+        p->position += (vel - vel_n * epi::dot(vel, vel) * drag * delT) + p->acc / p->mass * delT * delT;
         p->acc = {};
     }
-    void processBoundryConstraint(float minX, float maxX, float minY, float maxY) {
-        for(auto& p : particles) {
-            if(p->position.x > maxX)
-                p->position.x = maxX;
-            if(p->position.y > maxY)
-                p->position.y = maxY;
+    void processBoundryConstraint(size_t begin = 0, size_t end = 0xffffff) {
+        for(int i = begin; i != std::min(end, particles.size()); i++) {
+            auto p = particles[i].get();
+            if(p->position.x > (width - 1)   * boxsize)
+                p->position.x = (width - 1)  * boxsize;
+            if(p->position.y > (height - 1)  * boxsize)
+                p->position.y = (height - 1) * boxsize;
 
-            if(p->position.x < minX)
-                p->position.x = minX;
-            if(p->position.y < minY)
-                p->position.y = minY;
+            if(p->position.x < 0)
+                p->position.x = 0;
+            if(p->position.y < 0)
+                p->position.y = 0;
         }
     }
     void insertIntoBoxes() {
         for(auto& p : particles) {
-            auto* box = boxOf(p->position);
-            if(!box)
+            auto* box = boxOf(p->position_old);
+            if(!box) {
+                std::cerr << "out of bounds";
                 continue;
+            }
             box->push_back(p.get());
             if(!box->isUsed)
                 last_boxes.push_back(box);
@@ -153,9 +143,16 @@ public:
         }
     }
     void processCollisions() {
-        for(auto& b : last_boxes) {
+        for(auto b : last_boxes) {
             processCollisionForBox(*b);
         }
+        // for(auto& p1 : particles) {
+        //     for(auto& p2 : particles) {
+        //         if(p1 == p2)
+        //             continue;
+        //         handleCollision(*p1, *p2);
+        //     }
+        // }
     }
     void updatePositions(float delT) {
         for(int i = 0; i < particles.size(); i++) {
@@ -177,8 +174,8 @@ public:
             }
         }
     }
-    void update(float delT, Grid& grid) {
-        const size_t iter_count = 8;
+    void update(float delT, Grid& grid, ThreadPool* tp) {
+        const size_t iter_count = 8U;
         float sdelT = delT / static_cast<float>(iter_count);
         
         for(int iter = 0; iter < iter_count; iter++) {
@@ -187,10 +184,10 @@ public:
                 b->clear();
             }
             last_boxes.clear();
-            processBoundryConstraint(0.f, grid.height, 0.f, grid.width);
             insertIntoBoxes();
             processCollisions();
             updatePositions(sdelT);
+            processBoundryConstraint();
             collideWithGrid(grid);
         }
     }

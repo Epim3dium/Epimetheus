@@ -34,3 +34,6 @@ sf::Vector2f epi::rotate(sf::Vector2f vec, float angle) {
 float epi::length(sf::Vector2f v) {
     return sqrt(v.x * v.x + v.y * v.y);
 }
+float epi::dot(sf::Vector2f a, sf::Vector2f b) {
+    return  a.x * b.x + a.y * b.y;
+}
