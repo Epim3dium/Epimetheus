@@ -54,18 +54,30 @@ public:
             }
         }
         static vec2i last_mouse_pos = getMousePos();
-        if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+        if(sf::Mouse::isButtonPressed(sf::Mouse::Left) || sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
             vec2f mouse_pos = (vec2f)getMousePos();
             auto px_size = pixelSize(getSize());
             mouse_pos.x /= px_size;
             mouse_pos.y /= px_size;
             mouse_pos.y = grid.height - mouse_pos.y - 1;
-            const int spawn_size = 10;
+            const int spawn_size = 2;
             auto force = vec2f(getMousePos() - last_mouse_pos) * 1000.f;
-            for(float y = mouse_pos.y; y < mouse_pos.y + spawn_size; y += Particles::radius * 2.f) {
-                for(float x = mouse_pos.x; x < mouse_pos.x + spawn_size; x += Particles::radius * 2.f) {
-                    particle_manager.add({x, y}, Cell(eCellType::Water));
-                    particle_manager.particles.acc.back() += vec2f(force.x, -force.y);
+            force.y *= -1;
+            static int ticks  = 0;
+            ticks++;
+            if(ticks % 10 == 0 && sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
+                std::vector<vec2f> shape;
+                shape.push_back(mouse_pos + vec2f(-10, -10));
+                shape.push_back(mouse_pos + vec2f(10, -10));
+                shape.push_back(mouse_pos + vec2f(10, 10));
+
+                particle_manager.addShape(shape, Cell(eCellType::Sand), force);
+            }
+            for(float y = mouse_pos.y; y < mouse_pos.y + spawn_size; y += ParticleGroup::radius * 2.f) {
+                for(float x = mouse_pos.x; x < mouse_pos.x + spawn_size; x += ParticleGroup::radius * 2.f) {
+                    if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+                        particle_manager.add({x, y}, Cell(eCellType::Water), force);
+                    }
                 }
             }
         }
@@ -87,7 +99,7 @@ public:
         ImGui::Begin("options");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
         1000.0/double(ImGui::GetIO().Framerate), double(ImGui::GetIO().Framerate));
-        ImGui::Text("particle count: %zu", particle_manager.particles.size());
+        ImGui::Text("particle count: %zu", particle_manager.size());
         ImGui::End();
     }
     Demo(size_t w, size_t h) : App(w, h, "demo"), grid(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE), particle_manager(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE) {}

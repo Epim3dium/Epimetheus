@@ -9,7 +9,7 @@ void App::run() {
     if(!onSetup())
         return;
     if (!ImGui::SFML::Init(m_window)) return;
-    m_window.setFramerateLimit(120);
+    m_window.setFramerateLimit(60);
     sf::Clock sfml_clock;
     while (m_window.isOpen()) {
         sf::Event event;

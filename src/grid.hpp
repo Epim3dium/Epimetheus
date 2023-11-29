@@ -19,8 +19,8 @@ class Grid {
 public:
     sf::Image img;
     std::vector<Cell> world;
-    std::vector<AABB> current_segments;
-    std::vector<AABB> last_segments;
+    std::vector<AABBi> current_segments;
+    std::vector<AABBi> last_segments;
     const size_t width;
     const size_t height;
     size_t last_tick_updated = 1;
@@ -42,7 +42,7 @@ public:
     Grid(size_t w, size_t h)
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
     {
-        current_segments = std::vector<AABB>(segmentsWidth() * segmentsHeight());
+        current_segments = std::vector<AABBi>(segmentsWidth() * segmentsHeight());
         for(int x = 0; x < width; x++) {
             for(int y = 0; y < height; y++) {
                 if(x == 0 || y == 0 || x == width - 1 || y == height - 1) {

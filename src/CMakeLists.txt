@@ -7,6 +7,7 @@ set(SOURCE_FILES
     debug/log.cpp
 
     math/math_func.cpp
+    math/geometry_func.cpp
 
     # scene/entity.cpp
     # scene/debug_shape.cpp
@@ -22,6 +23,7 @@ set(HEADER_FILES
     math/math_func.hpp
     math/math_defs.hpp
     math/math.hpp
+    math/geometry_func.hpp
 
 
     io/app.hpp

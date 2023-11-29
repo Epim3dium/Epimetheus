@@ -1,28 +1,29 @@
 #ifndef EPI_AABB_HPP
 #define EPI_AABB_HPP
 #include "math/math_defs.hpp"
+template<class T>
 struct AABB {
-    vec2i min;
-    vec2i max;
-    vec2i center() const {
+    sf::Vector2<T> min;
+    sf::Vector2<T> max;
+    sf::Vector2<T> center() const {
         return min + size() / 2;
     }
-    vec2i size() const {
+    sf::Vector2<T> size() const {
         return max - min;
     }
-    float top() const {
+    T top() const {
         return max.y;
     }
-    float bottom() const {
+    T bottom() const {
         return min.y;
     }
-    float left() const {
+    T left() const {
         return min.x;
     }
-    float right() const {
+    T right() const {
         return max.x;
     }
-    void expandToContain(vec2i point) {
+    void expandToContain(sf::Vector2<T> point) {
         min.x = std::fmin(min.x, point.x);
         min.y = std::fmin(min.y, point.y);
         max.x = std::fmax(max.x, point.x);
@@ -30,4 +31,6 @@ struct AABB {
     }
 
 };
+typedef AABB<float> AABBf;
+typedef AABB<int> AABBi;
 #endif //EPI_AABB_HPP
