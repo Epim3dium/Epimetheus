@@ -37,3 +37,12 @@ float epi::length(sf::Vector2f v) {
 float epi::dot(sf::Vector2f a, sf::Vector2f b) {
     return  a.x * b.x + a.y * b.y;
 }
+vec2f epi::normal(vec2f v) {
+    return v / length(v);
+}
+vec2f epi::proj(vec2f a, vec2f plane_norm) {
+    return (dot(a, plane_norm) / dot(plane_norm, plane_norm)) * plane_norm;
+}
+float epi::cross(vec2f a, vec2f b) {
+    return a.x * b.y - b.x * a.y;
+}

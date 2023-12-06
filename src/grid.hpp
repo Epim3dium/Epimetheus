@@ -15,6 +15,8 @@
 #include <vector>
 
 #define SEGMENT_SIZE 32
+namespace epi {
+    class ParticleManager;
 class Grid {
 public:
     sf::Image img;
@@ -87,6 +89,7 @@ public:
                     if (get(x, y).last_time_updated >= last_tick_updated)
                         continue;
                     world[m_idx(x, y)].last_time_updated = last_tick_updated;
+                    world[m_idx(x, y)].isFloating = false;
                     auto func = Cell::g_updates[static_cast<size_t>(world[m_idx(x, y)].type)];
                     func(*this, {x, y});
                 }
@@ -94,6 +97,8 @@ public:
         }
         last_tick_updated++;
     }
+    void convertFloatingParticles(ParticleManager& manager);
+
     const Cell& get(int x, int y) const { return world[m_idx(x, y)]; }
     const Cell& get(sf::Vector2i v) const { return world[m_idx(v.x, v.y)]; }
     void set(sf::Vector2i v, Cell c) { 
@@ -114,7 +119,10 @@ public:
                 continue;
             for (int y = t.min.y - 1; y <= t.max.y + 1; y++) {
                 for (int x = t.min.x - 1; x <= t.max.x + 1; x++) {
-                    img.setPixel(x, y, get(x, y).color);
+                    auto color = get(x, y).color;
+                    if(get(x, y).isFloating)
+                        color = sf::Color::Red;
+                    img.setPixel(x, y, color);
                 }
             }
         }
@@ -126,4 +134,6 @@ public:
         target.draw(spr);
     }
 };
+
+}
 #endif // EPI_GRID_HPP

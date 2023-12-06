@@ -9,14 +9,10 @@
 #include "math/math_defs.hpp"
 #include "math/math_func.hpp"
 #include "timer.h"
-#include "templates/component_group.hpp"
-#include "templates/primitive_wrapper.hpp"
 #include "utils/time.hpp"
 
 
 using namespace epi;
-
-#include <gtest/gtest.h>
 
 #define GRID_DOWNSCALE 2
 class Demo : public App {
@@ -60,29 +56,38 @@ public:
             mouse_pos.x /= px_size;
             mouse_pos.y /= px_size;
             mouse_pos.y = grid.height - mouse_pos.y - 1;
-            const int spawn_size = 2;
-            auto force = vec2f(getMousePos() - last_mouse_pos) * 1000.f;
+            const float spawn_size = 1.0f;
+            auto force = vec2f(getMousePos() - last_mouse_pos) * 2000.f;
             force.y *= -1;
             static int ticks  = 0;
             ticks++;
-            if(ticks % 10 == 0 && sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
+            if(sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
                 std::vector<vec2f> shape;
-                shape.push_back(mouse_pos + vec2f(-10, -10));
-                shape.push_back(mouse_pos + vec2f(10, -10));
-                shape.push_back(mouse_pos + vec2f(10, 10));
+                shape.push_back(mouse_pos + vec2f(-30, -30));
+                shape.push_back(mouse_pos + vec2f(30, -30));
+                shape.push_back(mouse_pos + vec2f(30, 30));
 
                 particle_manager.addShape(shape, Cell(eCellType::Sand), force);
             }
-            for(float y = mouse_pos.y; y < mouse_pos.y + spawn_size; y += ParticleGroup::radius * 2.f) {
-                for(float x = mouse_pos.x; x < mouse_pos.x + spawn_size; x += ParticleGroup::radius * 2.f) {
-                    if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-                        particle_manager.add({x, y}, Cell(eCellType::Water), force);
+            bool canSpawn = true;
+            for(auto dir : {vec2f{0, 0}, {0, -1}, {0, 1}, {1, 0}, {-1, 0}, {1, 1}, {-1, -1}}) {
+                if(particle_manager.queue(mouse_pos + dir * ParticleGroup::radius).size() != 0) {
+                    canSpawn = false;
+                }
+            }
+            if(canSpawn) {
+                for(float y = mouse_pos.y - spawn_size / 2; y < mouse_pos.y + spawn_size; y += ParticleGroup::radius * 2.f) {
+                    for(float x = mouse_pos.x - spawn_size / 2; x < mouse_pos.x + spawn_size; x += ParticleGroup::radius * 2.f) {
+                        if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+                            particle_manager.add({x, y}, Cell(eCellType::Water), force);
+                        }
                     }
                 }
             }
         }
         last_mouse_pos = getMousePos();
         grid.update(Time::deltaTime());
+        // grid.convertFloatingParticles(particle_manager);
         particle_manager.update(Time::deltaTime(), grid);
     }
     void onRender(sf::RenderWindow& window) override {

@@ -2,6 +2,7 @@
 #include "SFML/Graphics/Color.hpp"
 #include "SFML/System/Vector2.hpp"
 #include <unordered_map>
+namespace epi {
 enum class eCellType {
     Bedrock,
     Air,
@@ -16,6 +17,7 @@ struct Cell {
     eCellType type;
     sf::Color color;
     size_t last_time_updated = 0;
+    bool isFloating = false;
 
     static const updateFunc_t g_updates[];
     static const std::unordered_map<eCellType, sf::Color> g_colors;
@@ -23,3 +25,5 @@ struct Cell {
     Cell(eCellType t) : type(t), color(g_colors.at(t)) {}
 
 };
+
+}

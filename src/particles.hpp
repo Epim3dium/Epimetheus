@@ -23,7 +23,7 @@ struct StaticParticle {
     vec2f position;
     Cell cell_info;
     vec2f position_old;
-    vec2f acc = {};
+    vec2f force = {};
     float mass;
     size_t id;
     void updatePosition(float delT) {
@@ -34,43 +34,13 @@ struct StaticParticle {
         position_old = position;
         position += (vel - vel_n * epi::dot(vel, vel) * drag * delT);
 
-        position += acc / mass * delT * delT;
-        acc = {0, -200};
+        position += force / mass * delT * delT;
+        force = {0, -200 * mass};
     }
     StaticParticle(vec2f p, Cell c, float m, vec2f a)
-        : position(p), position_old(p), cell_info(c), mass(m), acc(a),
+        : position(p), position_old(p), cell_info(c), mass(m), force(a),
           id(getNextId()) {}
 };
-struct Constraint {
-    virtual void update() = 0;
-    virtual std::vector<StaticParticle*> getConstraintParticles() = 0;
-    virtual ~Constraint() {}
-};
-struct DistanceConstraint : public Constraint  {
-    StaticParticle* p1;
-    StaticParticle* p2;
-    float len;
-    float stretch_damping = 0.f;
-    float squeeze_damping = 0.f;
-    void update() override {
-        auto dir = p1->position - p2->position;
-        auto l = length(dir);
-        auto diff = len - l;
-        auto norm = dir / l;
-        auto damping = diff > 0.f ? squeeze_damping : stretch_damping;
-        p1->position += norm * diff * (1.f - damping) * 0.5f;
-        p2->position -= norm * diff * (1.f - damping) * 0.5f;
-    }
-    std::vector<StaticParticle*> getConstraintParticles() override {
-        return {p1, p2};
-    }
-    DistanceConstraint(StaticParticle* a, StaticParticle* b, float l)
-        : p1(a), p2(b), len(l) {}
-    DistanceConstraint(StaticParticle* a, StaticParticle* b) : p1(a), p2(b) {
-        len = length(a->position - b->position);
-    }
-};
-
 struct ParticleGroup {
     std::vector<vec2f> position;
     std::vector<Cell> cell_info;
@@ -131,7 +101,7 @@ struct ParticleGroup {
     void collideWithGrid(Grid& grid) {
         for (int i = 0; i < size(); i++) {
             auto p = position[i];
-            if (grid.get(p.x, p.y).type != eCellType::Air) {
+            if (grid.get(p.x, p.y).type != eCellType::Air && !grid.get(p.x, p.y).isFloating) {
                 auto op = position_old[i];
                 if (!(op.x == 0 || op.y == 0 || op.x == grid.width - 1 ||
                       op.y == grid.height - 1))
@@ -156,22 +126,190 @@ struct ParticleGroup {
     }
     static constexpr float radius = 0.5f;
 };
-class ParticleManager {
-    size_t width;
-    size_t height;
+struct ParticleCollisionGrid {
     struct BoxT : public std::vector<vec2f*> {
         bool isUsed = false;
     };
+    const size_t height;
+    const size_t width;
 
     std::vector<BoxT> boxes;
-    std::vector<BoxT*> last_boxes;
+    std::vector<BoxT*> used_boxes;
 
+    static constexpr float boxsize = ParticleGroup::radius * 2.f;
+
+    ParticleCollisionGrid(const float w, const float  h) : width(w / boxsize), height(h / boxsize), boxes(width * height)  {}
+
+
+    BoxT* boxOf(vec2f pos) {
+        int x = floorf(pos.x / boxsize);
+        int y = floorf(pos.y / boxsize);
+        if (y >= height || y < 0 || x >= width || x < 0)
+            return nullptr;
+        return &boxes[y * width + x];
+    }
+    void add(vec2f& p) {
+        auto* box = boxOf(p);
+        if (!box) {
+            std::cerr << "out of bounds";
+            return;
+        }
+        box->push_back(&p);
+        if (!box->isUsed)
+            used_boxes.push_back(box);
+        box->isUsed = true;
+    }
+    void clear() {
+        for (auto& b : used_boxes) {
+            b->isUsed = false;
+            b->clear();
+        }
+        used_boxes.clear();
+    }
+    std::array<BoxT*, 8U> getAdjacentBoxes(BoxT& box) {
+        std::array<BoxT*, 8U> result;
+
+        size_t index = &box - &boxes.front();
+        int y = index / width;
+        int x = index - (y * width);
+        size_t cur_idx = 0;
+        for (int dy : {1, 0, -1}) {
+            for (int dx : {1, 0, -1}) {
+                if (dy == 0 && dx == 0)
+                    continue;
+                if (x + dx < 0 || x + dx >= width || y + dy < 0 ||
+                    y + dy >= height) {
+                    result[cur_idx] = nullptr;
+                } else {
+                    result[cur_idx] = &boxes[(y + dy) * width + x + dx];
+                }
+                cur_idx++;
+            }
+        }
+        assert(cur_idx == 8);
+
+        return result;
+    }
+};
+struct Constraint {
+    virtual void update(ParticleCollisionGrid&) = 0;
+    virtual std::vector<StaticParticle*> getConstraintParticles() = 0;
+    virtual ~Constraint() {}
+};
+struct DistanceConstraint : public Constraint  {
+    StaticParticle* p1;
+    StaticParticle* p2;
+    float len;
+    float stretch_damping = 0.1f;
+    float squeeze_damping = 0.1f;
+    void update(ParticleCollisionGrid& grid) override {
+        auto dir = p1->position - p2->position;
+        auto l = length(dir);
+        auto diff = len - l;
+        auto norm = dir / l;
+        auto damping = diff > 0.f ? squeeze_damping : stretch_damping;
+        p1->position += norm * diff * (1.f - damping) * 0.5f;
+        p2->position -= norm * diff * (1.f - damping) * 0.5f;
+    }
+    std::vector<StaticParticle*> getConstraintParticles() override {
+        return {p1, p2};
+    }
+    DistanceConstraint(StaticParticle* a, StaticParticle* b, float l)
+        : p1(a), p2(b), len(l) {}
+    DistanceConstraint(StaticParticle* a, StaticParticle* b) : p1(a), p2(b) {
+        len = length(a->position - b->position);
+    }
+};
+struct VolumeConstraint : public Constraint  {
+    std::array<StaticParticle*, 3U> particles;
+    float mass_total;
+    float damping = 0.90f;
+    void moveOutside(vec2f& point, std::vector<vec2f>& polygon) {
+        if(!isPointInPolygon(point, polygon)) {
+            return;
+        }
+        vec2f closest;
+        float min_dist = 0xffffff;
+        vec2f last = polygon.back();
+        for(auto p : polygon) {
+            auto cur = findClosestPointOnRay(p, last - p, point);
+            auto dist_cur = length(cur - point);
+            if(dist_cur < min_dist) {
+                min_dist = dist_cur;
+                closest = cur;
+            }
+            last = p;
+        }
+        vec2f offset = (closest - point) * damping;
+        float mass_ratio = 1.f / (1.f + mass_total);
+        float mass_ratio_polygon = mass_total / (1.f + mass_total);
+        point += offset * mass_ratio_polygon * 0.5f;
+        for(auto& point : polygon) {
+            point += -offset * mass_ratio * 0.5f;
+        }
+    }
+    void processBox(ParticleCollisionGrid::BoxT& box, std::vector<vec2f>& polygon) {
+        for(auto& p : box) {
+            for(auto& ptr : particles) {
+                if(p == &ptr->position) {
+                    return;
+                }
+            }
+            moveOutside(*p, polygon);
+        }
+    }
+    void update(ParticleCollisionGrid& grid) override {
+        std::vector<vec2f> polygon;
+        for(auto particle : particles) {
+            polygon.push_back(particle->position);
+        }
+        auto center = std::reduce(polygon.begin(), polygon.end()) / static_cast<float>(polygon.size());
+        for(auto& point : polygon) {
+            point += normal(point - center);
+        }
+
+        AABB aabb = AABBfromPolygon(polygon);
+        for(auto y = aabb.bottom(); y < aabb.top(); y += grid.boxsize) {
+            for(auto x = aabb.left(); x < aabb.right(); x += grid.boxsize) {
+                auto cur_box = grid.boxOf(vec2f(x, y));
+                if(cur_box == nullptr)
+                    continue;
+                processBox(*cur_box, polygon);
+            }
+        }
+        for(auto particle : particles) {
+            auto point = polygon.front();
+            particle->position = point - normal(point - center);
+            polygon.erase(polygon.begin());
+        }
+    }
+    std::vector<StaticParticle*> getConstraintParticles() override {
+        return {particles[0], particles[1], particles[2]};
+    }
+    VolumeConstraint(std::array<StaticParticle*, 3U> arr, float volume = 0.f)
+        : particles(arr) 
+    {
+        mass_total = 100.f;
+        // for(auto& particle : particles) {
+        //     mass_total += particle->mass;
+        // }
+        for(auto particle : particles) {
+            particle->mass = mass_total;
+        }
+    }
+};
+
+class ParticleManager {
+    float width;
+    float height;
+
+    ParticleCollisionGrid part_col_grid;
     // continuous
     ParticleGroup dynamic_particles;
     // non moving memory
-    std::list<StaticParticle> restrained_particles;
+    std::list<StaticParticle> constrained_particles;
 
-    std::vector<std::unique_ptr<Constraint>> restraints;
+    std::vector<std::unique_ptr<Constraint>> constraints;
 
     bool m_handleCollision(vec2f& p1, float m1, vec2f& p2, float m2) {
         float l = epi::dot(p1 - p2, p1 - p2);
@@ -183,15 +321,15 @@ class ParticleManager {
         constexpr float response_coef = 0.75f;
         float mag = (min_r - l) * 0.5f * response_coef;
 
-        const float mass_ratio_1 = m1 / (m1 + m2);
-        const float mass_ratio_2 = m2 / (m1 + m2);
+        const float mass_ratio_1 = m2 / (m1 + m2);
+        const float mass_ratio_2 = m1 / (m1 + m2);
 
         p1 += n * mass_ratio_1 * mag;
         p2 += -n * mass_ratio_2 * mag;
         return true;
     }
-    void m_processCollisionForBox(BoxT& box) {
-        auto adj = getAdjacentBoxes(box);
+    void m_processCollisionForBox(ParticleCollisionGrid::BoxT& box) {
+        auto adj = part_col_grid.getAdjacentBoxes(box);
         for (auto p1 : box) {
             for (auto p2 : box) {
                 if (p1 == p2)
@@ -220,12 +358,12 @@ class ParticleManager {
     // }
     void m_updatePositions(float delT) {
         dynamic_particles.updatePositions(delT);
-        for (auto& p : restrained_particles) {
+        for (auto& p : constrained_particles) {
             p.updatePosition(delT);
         }
     }
     void m_processBoundryConstraintStatic() {
-        for (auto& p : restrained_particles) {
+        for (auto& p : constrained_particles) {
             p.position.x = std::clamp<float>(p.position.x, 0, width - 1);
             p.position.y = std::clamp<float>(p.position.y, 0, height - 1);
             p.position_old.x =
@@ -237,30 +375,12 @@ class ParticleManager {
     void m_insertIntoBoxesDynamic() {
         size_t index = 0;
         for (auto& p : dynamic_particles.position) {
-            auto* box = boxOf(p);
-            if (!box) {
-                std::cerr << "out of bounds";
-                continue;
-            }
-            box->push_back(&p);
-            if (!box->isUsed)
-                last_boxes.push_back(box);
-            box->isUsed = true;
-            index++;
+            part_col_grid.add(p);
         }
     }
     void m_insertIntoBoxesStatic() {
-        for (auto& particle : restrained_particles) {
-            auto& p = particle.position;
-            auto* box = boxOf(p);
-            if (!box) {
-                std::cerr << "out of bounds";
-                continue;
-            }
-            box->push_back(&p);
-            if (!box->isUsed)
-                last_boxes.push_back(box);
-            box->isUsed = true;
+        for (auto& particle : constrained_particles) {
+            part_col_grid.add(particle.position);
         }
     }
     void m_insertIntoBoxes() {
@@ -290,8 +410,8 @@ class ParticleManager {
         //         handleCollision(*p1, *p2);
         //     }
         // }
-        for (int i = 0; i != last_boxes.size(); i++) {
-            m_processCollisionForBox(*last_boxes[i]);
+        for (auto& b : part_col_grid.used_boxes) {
+            m_processCollisionForBox(*b);
         }
     }
     void m_processBoundryConstraint() {
@@ -303,70 +423,38 @@ class ParticleManager {
     m_collideWithGridStatic(std::list<StaticParticle>::iterator particle,
                             Grid& grid) {
         auto p = particle->position;
-        if (grid.get(p.x, p.y).type != eCellType::Air) {
+        if (grid.get(p.x, p.y).type != eCellType::Air && !grid.get(p.x, p.y).isFloating) {
             vec2i op = (vec2i)particle->position_old;
             if (!(op.x <= 0 || op.y <= 0 || op.x >= grid.width - 1 ||
                   op.y >= grid.height - 1))
                 grid.set({static_cast<int>(op.x), static_cast<int>(op.y)},
                          particle->cell_info);
-            return restrained_particles.erase(particle);
+            return constrained_particles.erase(particle);
         }
         return particle;
     }
     void m_processGridCollisions(Grid& grid) {
         dynamic_particles.collideWithGrid(grid);
-        for (auto it = restrained_particles.begin();
-             it != restrained_particles.end(); it++) {
+        for (auto it = constrained_particles.begin();
+             it != constrained_particles.end(); it++) {
             it = m_collideWithGridStatic(it, grid);
         }
     }
     void m_processConstraints() {
-        for (auto& r : restraints) {
-            r->update();
+        for (auto& r : constraints) {
+            r->update(part_col_grid);
         }
     }
 
 public:
     static constexpr float boxsize = ParticleGroup::radius * 2.f;
     inline size_t size() const {
-        return dynamic_particles.size() + restrained_particles.size();
+        return dynamic_particles.size() + constrained_particles.size();
     }
-    ParticleManager(size_t w, size_t h)
-        : width(w / boxsize), height(h / boxsize), boxes(width * height) {
-        std::cerr << width;
+    ParticleManager(float w, float h)
+        : width(w), height(h), part_col_grid(width, height) {
     }
 
-    BoxT* boxOf(vec2f pos) {
-        int x = floorf(pos.x / boxsize);
-        int y = floorf(pos.y / boxsize);
-        if (y >= height || y < 0 || x >= width || x < 0)
-            return nullptr;
-        return &boxes[y * width + x];
-    }
-    std::array<BoxT*, 8U> getAdjacentBoxes(BoxT& box) {
-        std::array<BoxT*, 8U> result;
-
-        size_t index = &box - &boxes.front();
-        int y = index / width;
-        int x = index - (y * width);
-        size_t cur_idx = 0;
-        for (int dy : {1, 0, -1}) {
-            for (int dx : {1, 0, -1}) {
-                if (dy == 0 && dx == 0)
-                    continue;
-                if (x + dx < 0 || x + dx >= width || y + dy < 0 ||
-                    y + dy >= height) {
-                    result[cur_idx] = nullptr;
-                } else {
-                    result[cur_idx] = &boxes[(y + dy) * width + x + dx];
-                }
-                cur_idx++;
-            }
-        }
-        assert(cur_idx == 8);
-
-        return result;
-    }
     void add(vec2f pos, Cell cell, vec2f acc = {}) {
         dynamic_particles.push_back(pos, cell, 1.f, acc);
     }
@@ -377,69 +465,33 @@ public:
         sort_clockwise(shape.begin(), shape.end());
         for(auto& p : shape)
             p += center;
-        AABBf aabb = AABBfromPolygon(shape);
-        auto diameter = ParticleGroup::radius * 2.f;
-
-        std::vector<std::vector<StaticParticle*>> pointer_matrix;
-
-        float tri_h = sqrt(3) * diameter / 2.f;
-
-        size_t yidx = 0;
-        for (float y = aabb.min.y; y < aabb.max.y; y += tri_h) {
-            pointer_matrix.push_back({});
-            auto& last_row = pointer_matrix.back();
-            size_t xidx = 0;
-            for (float x = aabb.min.x - (yidx % 2) * tri_h * 0.5f; x < aabb.max.x; x += diameter) {
-                last_row.push_back(nullptr);
-                auto& last_val = last_row.back();
-                if (isPointInPolygon(vec2f(x, y), shape)) {
-                    restrained_particles.push_back(
-                        StaticParticle(vec2f(x, y), cell, 1.f, acc));
-                    last_val = &restrained_particles.back();
-                }
-                xidx++;
-            }
-            yidx++;
+        std::vector<StaticParticle*> pointers;
+        for(auto& p : shape) {
+            constrained_particles.push_back(
+                StaticParticle(p, cell, 1.f, acc));
+            pointers.push_back(&constrained_particles.back());
         }
-        // creating restraints
-        auto checkAndPush = [&](StaticParticle* part1, StaticParticle* part2) {
-            if(part1 != nullptr && part2 != nullptr) {
-                restraints.push_back(std::make_unique<DistanceConstraint>(
-                    DistanceConstraint{part1, part2}));
-            }
-        };
-        for (int ii = 0; ii < pointer_matrix.size(); ii++) {
-            const auto& row = pointer_matrix[ii];
-            for(int i = 0; i < row.size() - 1; i++) {
-                auto* part1 = row[i];
-                auto* part2 = row[i + 1];
-                checkAndPush(part1, part2);
-            }
+        auto last = pointers.back();
+        for(auto& p : pointers) {
+            constraints.push_back(std::make_unique<DistanceConstraint>(DistanceConstraint(p, last)));
+            last = p;
         }
-        for (int ii = 0; ii < pointer_matrix.size() - 1; ii++) {
-            const auto& row = pointer_matrix[ii];
-            const auto& rowBelow = pointer_matrix[ii + 1];
-            for(int i = 0; i < row.size(); i++) {
-                auto* part1 = row[i];
-                auto* part2 = rowBelow[i];
-                checkAndPush(part1, part2);
-            }
-        }
-        for (int ii = 0; ii < pointer_matrix.size() - 1; ii++) {
-            const auto& row = pointer_matrix[ii];
-            const auto& rowBelow = pointer_matrix[ii + 1];
-            for(int i = 0; i < row.size() - 1; i++) {
-                auto* part1 = row[i];
-                auto* part2 = rowBelow[i + 1];
-                checkAndPush(part1, part2);
-            }
-        }
+        constraints.push_back(std::make_unique<VolumeConstraint>(VolumeConstraint({pointers[0], pointers[1], pointers[2]})));
+    }
+    std::vector<vec2f*> queue(vec2f pos) {
+        if(part_col_grid.boxOf(pos))
+            return *part_col_grid.boxOf(pos);
+        return {};
     }
     void update(float delT, Grid& grid) {
         const size_t steps = 8U;
         float sdelT = delT / static_cast<float>(steps);
 
         for (int iter = 0; iter < steps; iter++) {
+
+            part_col_grid.clear();
+
+            m_processGridCollisions(grid);
 
             m_insertIntoBoxes();
 
@@ -450,14 +502,6 @@ public:
             m_processConstraints();
 
             m_processBoundryConstraint();
-
-            // m_processGridCollisions(grid);
-
-            for (auto& b : last_boxes) {
-                b->isUsed = false;
-                b->clear();
-            }
-            last_boxes.clear();
         }
     }
 
@@ -470,7 +514,7 @@ public:
             v.color = dynamic_particles.cell_info[i].color;
             arr.append(v);
         }
-        for (auto& particle : restrained_particles) {
+        for (auto& particle : constrained_particles) {
             sf::Vertex v;
             v.position = particle.position;
             v.color = particle.cell_info.color;
@@ -479,6 +523,7 @@ public:
         target.draw(arr);
     }
 };
+
 
 } // namespace epi
 #endif // EPI_PARTICLES_HPP
