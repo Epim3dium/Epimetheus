@@ -2,7 +2,8 @@
 #include "math_defs.hpp"
 #include <algorithm>
 
-void epi::sort_clockwise(std::vector<sf::Vector2f>::iterator begin,
+namespace epi {
+void sort_clockwise(std::vector<sf::Vector2f>::iterator begin,
                          std::vector<sf::Vector2f>::iterator end) {
     std::sort(begin, end, [](sf::Vector2f a, sf::Vector2f b) {
         auto anga = std::atan2(a.x, a.y);
@@ -21,28 +22,43 @@ void epi::sort_clockwise(std::vector<sf::Vector2f>::iterator begin,
         return anga < angb;
     });
 }
-float epi::angle(sf::Vector2f pivot, sf::Vector2f a, sf::Vector2f b) {
-    return atan2(b.y - pivot.y, b.x - pivot.x) -
-           atan2(a.y - pivot.y, a.x - pivot.x);
+float angleAround(vec2f a, vec2f pivot, vec2f b) {
+    return angle(a - pivot, b - pivot);
 }
-sf::Vector2f epi::rotate(sf::Vector2f vec, float angle) {
+vec2f sign(vec2f x) {
+    return { std::copysign(1.f, x.x), std::copysign(1.f, x.y) };
+}
+vec2f rotateVec(vec2f vec, float angle) {
+    return vec2f(cos(angle) * vec.x - sin(angle) * vec.y,
+        sin(angle) * vec.x + cos(angle) * vec.y);
+}
+
+float qlen(vec2f v) {
+    return v.x * v.x + v.y * v.y;
+}
+float angle(vec2f a, vec2f b) {
+    return atan2(cross(a,b), dot(a,b));
+}
+sf::Vector2f rotate(sf::Vector2f vec, float angle) {
     return { 
         cosf(angle) * vec.x - sinf(angle) * vec.y, 
         sinf(angle) * vec.x + cosf(angle) * vec.y, 
     };
 }
-float epi::length(sf::Vector2f v) {
+float length(sf::Vector2f v) {
     return sqrt(v.x * v.x + v.y * v.y);
 }
-float epi::dot(sf::Vector2f a, sf::Vector2f b) {
+float dot(sf::Vector2f a, sf::Vector2f b) {
     return  a.x * b.x + a.y * b.y;
 }
-vec2f epi::normal(vec2f v) {
+vec2f normal(vec2f v) {
     return v / length(v);
 }
-vec2f epi::proj(vec2f a, vec2f plane_norm) {
+vec2f proj(vec2f a, vec2f plane_norm) {
     return (dot(a, plane_norm) / dot(plane_norm, plane_norm)) * plane_norm;
 }
-float epi::cross(vec2f a, vec2f b) {
+float cross(vec2f a, vec2f b) {
     return a.x * b.y - b.x * a.y;
+}
+
 }

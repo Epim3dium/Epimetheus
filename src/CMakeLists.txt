@@ -1,5 +1,6 @@
 enable_testing()
 set(SOURCE_FILES
+    types.cpp
     io/app.cpp
 
     memory/pool_allocator.cpp
@@ -9,12 +10,14 @@ set(SOURCE_FILES
     math/math_func.cpp
     math/geometry_func.cpp
 
-    # scene/entity.cpp
-    # scene/debug_shape.cpp
-    # scene/transform.cpp
-    # scene/script.cpp
+    physics/col_utils.cpp
+    physics/physics_manager.cpp
+    physics/restraint.cpp
+    physics/rigidbody.cpp
+    physics/solver.cpp
 )
 set(HEADER_FILES
+    types.hpp
     multithreading/thread_pool.hpp
 
     memory/pool_allocator.hpp
@@ -34,16 +37,20 @@ set(HEADER_FILES
 
     grid.cpp
 
-    # scene/entity.hpp
-    # scene/debug_shape.hpp
-    # scene/transform.hpp
-    # scene/script.hpp
-
     templates/set.hpp
     templates/stack_linked_list.hpp
 
     debug/log.hpp
     debug/debug.hpp
+
+    physics/col_utils.hpp
+    physics/physics_manager.hpp
+    physics/restraint.hpp
+    physics/rigidbody.hpp
+    physics/solver.hpp
+    physics/collider.hpp
+    physics/material.hpp
+    physics/transform.hpp
 )
 set(TEST_FILES
     main.cpp

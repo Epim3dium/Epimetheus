@@ -6,13 +6,19 @@
 namespace epi {
 
 void sort_clockwise(std::vector<sf::Vector2f>::iterator begin, std::vector<sf::Vector2f>::iterator end);
-float angle(sf::Vector2f pivot, sf::Vector2f a, sf::Vector2f b);
 sf::Vector2f rotate(sf::Vector2f vec, float angle);
 float length(sf::Vector2f v);
+float qlen(vec2f);
 vec2f normal(vec2f v);
 float dot(sf::Vector2f a, sf::Vector2f b);
 vec2f proj(vec2f a, vec2f plane_norm);
 float cross(vec2f a, vec2f b);
+
+float angleAround(vec2f a, vec2f pivot, vec2f b);
+//around origin point
+float angle(vec2f, vec2f);
+vec2f sign(vec2f);
+vec2f rotateVec(vec2f vec, float angle);
 
 
 }

@@ -225,7 +225,7 @@ struct VolumeConstraint : public Constraint  {
     float mass_total;
     float damping = 0.90f;
     void moveOutside(vec2f& point, std::vector<vec2f>& polygon) {
-        if(!isPointInPolygon(point, polygon)) {
+        if(!isOverlappingPointPoly(point, polygon)) {
             return;
         }
         vec2f closest;
@@ -268,7 +268,7 @@ struct VolumeConstraint : public Constraint  {
             point += normal(point - center);
         }
 
-        AABB aabb = AABBfromPolygon(polygon);
+        AABB aabb = AABB::CreateFromVerticies(polygon);
         for(auto y = aabb.bottom(); y < aabb.top(); y += grid.boxsize) {
             for(auto x = aabb.left(); x < aabb.right(); x += grid.boxsize) {
                 auto cur_box = grid.boxOf(vec2f(x, y));
