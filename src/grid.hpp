@@ -23,9 +23,10 @@ class Grid {
     std::vector<AABB> last_segments;
     void m_updateSegment(AABB seg);
     std::vector<std::vector<std::pair<vec2f, vec2f>>> m_extractRayGroups(AABB seg);
-    std::vector<std::vector<std::pair<vec2f, vec2f>>> m_extractPolygon(AABB seg);
+    std::vector<std::vector<vec2f>> m_extractPolygonPoints(AABB seg);
+    ConcavePolygon m_extractPolygon(AABB seg);
 public:
-    std::vector<std::vector<std::vector<std::pair<vec2f, vec2f>>>> segment_outlines;
+    std::vector<ConcavePolygon> segment_outlines;
     sf::Image img;
     const size_t width;
     const size_t height;

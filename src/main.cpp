@@ -203,25 +203,17 @@ public:
                 }
             }
         }
-        for(const auto& point_set : grid.segment_outlines) {
-            for(auto points : point_set) {
-                if(points.size() == 0)
-                    continue;
-                sf::Color colorA = sf::Color::Cyan;
-                sf::Color colorB = sf::Color::Blue;
-                size_t counter = 0;
-                for(auto p : points) {
-                    sf::Vertex vert[2];
-                    float gradient = static_cast<float>(counter) / static_cast<float>(points.size());
-                    sf::Color color;
-                    color.r = colorA.r * gradient + colorB.r * (1.f - gradient);
-                    color.g = colorA.g * gradient + colorB.g * (1.f - gradient);
-                    color.b = colorA.b * gradient + colorB.b * (1.f - gradient);
-                    vert[0].color = vert[1].color = color;
-                    vert[0].position = getScreenPos(p.first);
-                    vert[1].position = getScreenPos(p.second);
+        for(const auto& concave : grid.segment_outlines) {
+            for(auto poly : concave.getPolygons()) {
+                auto points = poly.getVertecies();
+
+                sf::Vertex vert[2];
+                vert[0].color = vert[1].color = sf::Color::Cyan;
+                vert[0].position = getScreenPos(points.back());
+                for(auto& p : points) {
+                    vert[1].position = getScreenPos(p);
                     window.draw(vert, 2U, sf::Lines);
-                    counter++;
+                    vert[0] = vert[1];
                 }
             }
         }

@@ -18,6 +18,7 @@ enum class eState {
 struct CellPropery {
     sf::Color init_color;
     eState state;
+    bool isColideable = false;
     float density = 1.f;
 };
 

@@ -1,27 +1,87 @@
 #include "grid.hpp"
 #include "RNG.h"
 #include "particles.hpp"
+#include "types.hpp"
 namespace epi {
-static void mergeAdjacentRays(std::vector<std::pair<vec2f, vec2f>>& ray_set) {
-    for(int i = 0; i < ray_set.size() - 1; i++) {
-        auto& a0 = ray_set[i].first;
-        auto& b0 = ray_set[i].second;
-        auto& a1 = ray_set[i + 1].first;
-        auto& b1 = ray_set[i + 1].second;
+static void mergeAdjacentRays(std::vector<vec2f>& points) {
+    for(int i = 0; i < points.size(); i++) {
+
+        vec2f& first = points[i];
+        vec2f& mid   = points[(i + 1 ) % points.size()];
+        vec2f& last  = points[(i + 2 ) % points.size()];
+
+        auto& a0 = first;
+        auto& b0 = mid;
+        auto& a1 = mid;
+        auto& b1 = last;
         if(normal(b0 - a0) == normal(b1 - a1)) {
             a1 = a0;
-            ray_set.erase(ray_set.begin() + i);
+            points.erase(points.begin() + (i + 1 ) % points.size());
             i--;
         }
     }
-    std::cerr << "size: " << ray_set.size() << "\n";
 }
-std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractPolygon(AABB seg) {
+std::vector<bool> findEdges(const std::vector<vec2f>& points, AABB seg) {
+    std::vector<bool> result;
+    for(auto p : points) {
+        if(p.x == seg.left() || p.x == seg.right() || p.y == seg.bottom() || p.y == seg.top()) {
+            result.push_back(true);
+        }else {
+            result.push_back(false);
+        }
+    }
+    return result;
+}
+static std::vector<vec2f> smoothAdjacentRays(const std::vector<vec2f>& points, AABB seg) {
+    std::vector<vec2f> new_set;
+    auto isEdge = findEdges(points, seg);
+    for(int i = 0; i < points.size(); i++) {
+        vec2f first = points[i];
+        vec2f cur = points[(i + 1) % points.size()];
+        if(isEdge[(i + 1) % points.size()] || isEdge[i]) {
+            new_set.push_back(first);
+        } else {
+            new_set.push_back((first + cur) * 0.5f);
+        }
+    }
+    return new_set;
+}
+std::vector<vec2f> convertToPoints(const std::vector<std::pair<vec2f, vec2f>>& pairs) {
+    std::vector<vec2f> result;
+    for(auto p : pairs) {
+        result.push_back(p.first);
+    }
+    return result;
+}
+
+std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
     auto ray_sets = m_extractRayGroups(seg);
+    std::vector<std::vector<vec2f>> point_sets;
     for(auto& set : ray_sets) {
+        point_sets.push_back(convertToPoints(set));
+    }
+    for(auto& set : point_sets) {
         mergeAdjacentRays(set);
     }
-    return ray_sets;
+    int smooth_steps = 0;
+    for(int i = 0 ; i < smooth_steps; i++) {
+        for(auto& set : point_sets) {
+            set = smoothAdjacentRays(set, seg);
+        }
+        for(auto& set : point_sets) {
+            mergeAdjacentRays(set);
+        }
+    }
+    return point_sets;
+}
+ConcavePolygon Grid::m_extractPolygon(AABB seg) {
+    std::vector<ConvexPolygon> all_polygons;
+    for(auto points : m_extractPolygonPoints(seg)) {
+        auto triangles = toTriangles(points);
+        auto polygons = toBiggestConvexPolygons(triangles);
+        all_polygons.insert(all_polygons.end(), polygons.begin(), polygons.end());
+    }
+    return  ConcavePolygon(all_polygons);
 }
 std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB seg) {
     struct BorderCheckLine {
@@ -52,7 +112,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
 
     auto checkAndAddLines = [&](int xoff, int yoff, const std::vector<BorderCheckLine>& checks) {
         vec2f p(xoff + xstart, yoff + ystart);
-        if(get(p.x, p.y).getPropery().state == eState::Solid) {
+        if(get(p.x, p.y).getPropery().isColideable) {
             for(auto check : checks) {
                 if(yoff == check.local_border.y || xoff == check.local_border.x) {
                     path[yoff + check.to.y][xoff + check.to.x] = check.from + vec2i(xoff, yoff);
@@ -61,7 +121,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
         }else {
             for(auto check : checks) {
                 if(yoff != check.local_border.y && xoff != check.local_border.x 
-                        && get(p.x + check.check_dir.x, p.y + check.check_dir.y).getPropery().state == eState::Solid) 
+                        && get(p.x + check.check_dir.x, p.y + check.check_dir.y).getPropery().isColideable) 
                 {
                     path[yoff + check.from.y][xoff + check.from.x] = check.to + vec2i(xoff, yoff);
                 }
