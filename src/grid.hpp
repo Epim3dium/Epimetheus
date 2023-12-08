@@ -7,7 +7,7 @@
 #include "SFML/Graphics/Sprite.hpp"
 #include "SFML/Graphics/Texture.hpp"
 #include "cell.hpp"
-#include "math/aabb.hpp"
+#include "types.hpp"
 #include <iostream>
 #include <map>
 #include <random>
@@ -18,11 +18,15 @@
 namespace epi {
     class ParticleManager;
 class Grid {
-public:
-    sf::Image img;
     std::vector<Cell> world;
-    std::vector<AABBi> current_segments;
-    std::vector<AABBi> last_segments;
+    std::vector<AABB> current_segments;
+    std::vector<AABB> last_segments;
+    void m_updateSegment(AABB seg);
+    std::vector<std::vector<std::pair<vec2f, vec2f>>> m_extractRayGroups(AABB seg);
+    std::vector<std::vector<std::pair<vec2f, vec2f>>> m_extractPolygon(AABB seg);
+public:
+    std::vector<std::vector<std::vector<std::pair<vec2f, vec2f>>>> segment_outlines;
+    sf::Image img;
     const size_t width;
     const size_t height;
     size_t last_tick_updated = 1;
@@ -44,7 +48,7 @@ public:
     Grid(size_t w, size_t h)
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
     {
-        current_segments = std::vector<AABBi>(segmentsWidth() * segmentsHeight());
+        current_segments = std::vector<AABB>(segmentsWidth() * segmentsHeight());
         for(int x = 0; x < width; x++) {
             for(int y = 0; y < height; y++) {
                 if(x == 0 || y == 0 || x == width - 1 || y == height - 1) {
@@ -73,38 +77,20 @@ public:
         //std::shuffle(segments[1].begin(), segments[1].end(), rng);
 
         for(auto& t : last_segments) {
-            if(t.max.x == -1) {
-                continue;
-            }
-            bool yinv = (last_tick_updated % 4 == 0 || last_tick_updated % 3 == 0);
-            int yincr = (yinv ? 1 : -1);
-            int ybegin = t.bottom() - 1;
-            int yend = t.top() + 1;
-
-            for (int y = (yinv ? ybegin : yend); y <= yend && y >= ybegin; y += yincr) {
-                int xincr = (last_tick_updated % 2 == 0 ? 1 : -1);
-                int xbegin = t.left() - 1;
-                int xend = t.right() + 1;
-                for(int x = (last_tick_updated % 2 == 0 ? xbegin : xend); x >= xbegin && x <= xend; x += xincr) {
-                    if (get(x, y).last_time_updated >= last_tick_updated)
-                        continue;
-                    world[m_idx(x, y)].last_time_updated = last_tick_updated;
-                    world[m_idx(x, y)].isFloating = false;
-                    auto func = Cell::g_updates[static_cast<size_t>(world[m_idx(x, y)].type)];
-                    func(*this, {x, y});
-                }
-            }
+            m_updateSegment(t);
         }
         last_tick_updated++;
     }
     void convertFloatingParticles(ParticleManager& manager);
 
-    const Cell& get(int x, int y) const { return world[m_idx(x, y)]; }
-    const Cell& get(sf::Vector2i v) const { return world[m_idx(v.x, v.y)]; }
+    const Cell& get(int x, int y) const {
+        return world[m_idx(x, y)]; 
+    }
+    const Cell& get(sf::Vector2i v) const { return get(v.x, v.y); }
     void set(sf::Vector2i v, Cell c) { 
         int base_x = v.x / SEGMENT_SIZE;
         int base_y = v.y / SEGMENT_SIZE;
-        current_segments[base_y * segmentsWidth() + base_x].expandToContain(v);
+        current_segments[base_y * segmentsWidth() + base_x].expandToContain(static_cast<vec2f>(v));
 
         world[m_idx(v.x, v.y)] = c; 
     }

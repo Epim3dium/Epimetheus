@@ -48,7 +48,7 @@ public:
     float time_immobile = 0.f;
     bool isSleeping = false;
 
-    std::vector<ConvexPolygon> getPolygonShape(Transform& trans) const {
+    std::vector<ConvexPolygon> getPolygonShape(const Transform& trans) const {
         auto t = shape;
         t.setPos(trans.getPos());
         t.setRot(trans.getRot());

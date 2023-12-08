@@ -9,6 +9,17 @@ enum class eCellType {
     Sand,
     Water,
 };
+enum class eState {
+    Liquid,
+    Gas,
+    Solid,
+    Powder
+};
+struct CellPropery {
+    sf::Color init_color;
+    eState state;
+    float density = 1.f;
+};
 
 
 class Grid;
@@ -20,9 +31,16 @@ struct Cell {
     bool isFloating = false;
 
     static const updateFunc_t g_updates[];
-    static const std::unordered_map<eCellType, sf::Color> g_colors;
+    static const CellPropery properties[];
 
-    Cell(eCellType t) : type(t), color(g_colors.at(t)) {}
+    const CellPropery& getPropery() const {
+        return properties[static_cast<size_t>(type)];
+    }
+
+    Cell(eCellType t) : type(t) 
+    {
+        color = getPropery().init_color;
+    }
 
 };
 

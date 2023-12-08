@@ -1,6 +1,9 @@
 enable_testing()
 set(SOURCE_FILES
     types.cpp
+    cell.cpp
+    grid.cpp
+
     io/app.cpp
 
     memory/pool_allocator.cpp
@@ -10,6 +13,7 @@ set(SOURCE_FILES
     math/math_func.cpp
     math/geometry_func.cpp
 
+
     physics/col_utils.cpp
     physics/physics_manager.cpp
     physics/restraint.cpp
@@ -18,6 +22,9 @@ set(SOURCE_FILES
 )
 set(HEADER_FILES
     types.hpp
+    cell.hpp
+    grid.hpp
+
     multithreading/thread_pool.hpp
 
     memory/pool_allocator.hpp
@@ -34,8 +41,6 @@ set(HEADER_FILES
 
     templates/buffer.hpp
     templates/component_group.hpp
-
-    grid.cpp
 
     templates/set.hpp
     templates/stack_linked_list.hpp

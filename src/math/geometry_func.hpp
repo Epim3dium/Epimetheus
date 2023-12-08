@@ -1,7 +1,6 @@
 #ifndef EPI_GEOMETRY_FUNC_HPP
 #define EPI_GEOMETRY_FUNC_HPP
 #include "math_defs.hpp"
-#include "aabb.hpp"
 #include <vector>
 #include "types.hpp"
 

@@ -35,8 +35,9 @@ void handleOverlap(RigidManifold& m1, RigidManifold& m2, const CollisionInfo& ma
     } else if(m1.rigidbody->isStatic) {
         t2.setPos(t2.getPos() - man.cn * man.overlap);
     } else {
-        t1.setPos(t1.getPos() + man.cn * man.overlap * 0.3f);
-        t2.setPos(t2.getPos() - man.cn * man.overlap * 0.3f);
+        constexpr float response_coef = 0.9f;
+        t1.setPos(t1.getPos() + man.cn * man.overlap * 0.5f * response_coef);
+        t2.setPos(t2.getPos() - man.cn * man.overlap * 0.5f * response_coef);
     }
 }
 void DefaultSolver::processReaction(const CollisionInfo& info, const RigidManifold& m1, 

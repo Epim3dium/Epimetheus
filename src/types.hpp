@@ -63,10 +63,10 @@ struct AABB {
         return min.x;
     };
     float bottom() const {
-        return max.y;
+        return min.y;
     };
     float top() const {
-        return min.y;
+        return max.y;
     };
     vec2f size() const {
         return max - min;
@@ -75,6 +75,12 @@ struct AABB {
         auto t = size();
         min = c - t / 2.f;
         max = c + t / 2.f;
+    }
+    void expandToContain(sf::Vector2f point) {
+        min.x = std::fmin(min.x, point.x);
+        min.y = std::fmin(min.y, point.y);
+        max.x = std::fmax(max.x, point.x);
+        max.y = std::fmax(max.y, point.y);
     }
     void setSize(vec2f s) {
         auto t = center();

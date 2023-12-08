@@ -130,7 +130,7 @@ void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
         return;
     auto& rb = *man.rigidbody;
     //processing dormants
-    if(length(rb.velocity) < DORMANT_MIN_VELOCITY && abs(rb.angular_velocity) < DORMANT_MIN_ANGULAR_VELOCITY) {
+    if(isSleepy && length(rb.velocity) < DORMANT_MIN_VELOCITY && abs(rb.angular_velocity) < DORMANT_MIN_ANGULAR_VELOCITY) {
         man.collider->time_immobile += delT;
     }else {
         man.collider->time_immobile = 0.f;

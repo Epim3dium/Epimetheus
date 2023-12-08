@@ -66,7 +66,8 @@ private:
     }
 public:
     //number of physics/collision steps per frame
-    size_t steps = 2;
+    size_t steps = 8;
+    bool isSleepy = false;
 
     /*
     * updates all rigidbodies bound applying their velocities and resoving collisions
@@ -94,7 +95,7 @@ public:
     void remove(const Restraint* restriant);
 
     //size should be max simulated size
-    PhysicsManager(AABB size) {}
+    PhysicsManager() {}
     ~PhysicsManager() {}
 };
 }
