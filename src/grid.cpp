@@ -112,7 +112,8 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
 
     auto checkAndAddLines = [&](int xoff, int yoff, const std::vector<BorderCheckLine>& checks) {
         vec2f p(xoff + xstart, yoff + ystart);
-        if(get(p.x, p.y).getPropery().isColideable) {
+        const auto& cell = get(p.x, p.y);
+        if(isCellColliderEligable(cell)) {
             for(auto check : checks) {
                 if(yoff == check.local_border.y || xoff == check.local_border.x) {
                     path[yoff + check.to.y][xoff + check.to.x] = check.from + vec2i(xoff, yoff);
@@ -120,8 +121,9 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
             }
         }else {
             for(auto check : checks) {
+                const auto& cell = get(p.x + check.check_dir.x, p.y + check.check_dir.y);
                 if(yoff != check.local_border.y && xoff != check.local_border.x 
-                        && get(p.x + check.check_dir.x, p.y + check.check_dir.y).getPropery().isColideable) 
+                        && isCellColliderEligable(cell)) 
                 {
                     path[yoff + check.from.y][xoff + check.from.x] = check.to + vec2i(xoff, yoff);
                 }
@@ -167,7 +169,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
     }
     return result;
 }
-void Grid::m_updateSegment(AABB seg) {
+void Grid::m_updateSegment(SegmentT seg, size_t index) {
     if (seg.max.x == -1) {
         return;
     }
@@ -175,12 +177,13 @@ void Grid::m_updateSegment(AABB seg) {
     int yincr = (yinv ? 1 : -1);
     int ybegin = seg.bottom() - 1;
     int yend = seg.top() + 1;
+    int xincr = (last_tick_updated % 2 == 0 ? 1 : -1);
+    int xbegin = seg.left() - 1;
+    int xend = seg.right() + 1;
+    if(seg.hasColliderChanged)
+        segment_outlines[index] = m_extractPolygon(seg);
 
-    segment_outlines.push_back(m_extractPolygon(seg));
     for (int y = (yinv ? ybegin : yend); y <= yend && y >= ybegin; y += yincr) {
-        int xincr = (last_tick_updated % 2 == 0 ? 1 : -1);
-        int xbegin = seg.left() - 1;
-        int xend = seg.right() + 1;
         for (int x = (last_tick_updated % 2 == 0 ? xbegin : xend);
              x >= xbegin && x <= xend; x += xincr) {
             if (get(x, y).last_time_updated >= last_tick_updated)

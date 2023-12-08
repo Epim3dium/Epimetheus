@@ -217,7 +217,6 @@ public:
                 }
             }
         }
-        grid.segment_outlines.clear();
 
         ImGui::Begin("options");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",

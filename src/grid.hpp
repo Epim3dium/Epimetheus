@@ -19,9 +19,16 @@ namespace epi {
     class ParticleManager;
 class Grid {
     std::vector<Cell> world;
-    std::vector<AABB> current_segments;
-    std::vector<AABB> last_segments;
-    void m_updateSegment(AABB seg);
+    struct SegmentT : public AABB {
+        bool hasColliderChanged = false;
+    };
+    std::vector<SegmentT> current_segments;
+    std::vector<SegmentT> last_segments;
+
+    inline static bool isCellColliderEligable(const Cell& c) {
+        return !c.isFloating && c.getPropery().isColideable;
+    }
+    void m_updateSegment(SegmentT seg, size_t index);
     std::vector<std::vector<std::pair<vec2f, vec2f>>> m_extractRayGroups(AABB seg);
     std::vector<std::vector<vec2f>> m_extractPolygonPoints(AABB seg);
     ConcavePolygon m_extractPolygon(AABB seg);
@@ -49,7 +56,8 @@ public:
     Grid(size_t w, size_t h)
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
     {
-        current_segments = std::vector<AABB>(segmentsWidth() * segmentsHeight());
+        current_segments = std::vector<SegmentT>(segmentsWidth() * segmentsHeight());
+        segment_outlines = std::vector<ConcavePolygon>(segmentsWidth() * segmentsHeight(), ConcavePolygon({}));
         for(int x = 0; x < width; x++) {
             for(int y = 0; y < height; y++) {
                 if(x == 0 || y == 0 || x == width - 1 || y == height - 1) {
@@ -72,13 +80,15 @@ public:
         for(auto& t : current_segments) {
             t.min = {0xffffff, 0xffffff};
             t.max = {-1, -1};
+            t.hasColliderChanged = false;
         }
         
         auto rng = std::default_random_engine{};
         //std::shuffle(segments[1].begin(), segments[1].end(), rng);
 
+        size_t idx = 0;
         for(auto& t : last_segments) {
-            m_updateSegment(t);
+            m_updateSegment(t, idx++);
         }
         last_tick_updated++;
     }
@@ -92,6 +102,8 @@ public:
         int base_x = v.x / SEGMENT_SIZE;
         int base_y = v.y / SEGMENT_SIZE;
         current_segments[base_y * segmentsWidth() + base_x].expandToContain(static_cast<vec2f>(v));
+        current_segments[base_y * segmentsWidth() + base_x].hasColliderChanged |= isCellColliderEligable(c);
+        current_segments[base_y * segmentsWidth() + base_x].hasColliderChanged |= isCellColliderEligable(world[m_idx(v.x, v.y)]);
 
         world[m_idx(v.x, v.y)] = c; 
     }
