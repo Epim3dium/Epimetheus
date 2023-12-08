@@ -40,6 +40,11 @@ class Collider : public Signal::Subject<ColliderEvent> {
     float m_inertia_dev_mass = -1.f;
     ConcavePolygon shape;
 public:
+    void setShape(ConcavePolygon new_shape) {
+        //TODO
+        shape = new_shape;
+        //remove
+    }
     Tag tag;
     Tag mask;
     bool isTrigger = false;

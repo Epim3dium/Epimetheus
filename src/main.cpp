@@ -203,8 +203,8 @@ public:
                 }
             }
         }
-        for(const auto& concave : grid.segment_outlines) {
-            for(auto poly : concave.getPolygons()) {
+        for(const auto& object : grid.segment_outlines) {
+            for(auto poly : object.collider.getPolygonShape(object.transform)) {
                 auto points = poly.getVertecies();
 
                 sf::Vertex vert[2];
@@ -225,7 +225,7 @@ public:
         ImGui::Text("dynamic object count: %zu", dynamic_objects.size());
         ImGui::End();
     }
-    Demo(size_t w, size_t h) : App(w, h, "demo"), grid(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE), particle_manager(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE) {}
+    Demo(size_t w, size_t h) : App(w, h, "demo"), grid(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE, physics_manager), particle_manager(w >> GRID_DOWNSCALE, h >> GRID_DOWNSCALE) {}
     ~Demo() { std::cerr << "demo destroyed\n"; }
 };
 

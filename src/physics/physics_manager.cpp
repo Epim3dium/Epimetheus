@@ -63,6 +63,11 @@ std::vector<PhysicsManager::ColInfo> PhysicsManager::processBroadPhase() {
     std::vector<PhysicsManager::ColInfo> result;
     std::vector<std::pair<float, RigidManifold>> all;
     for(auto& c : _rigidbodies) {
+        //TODO
+        if(c.collider->getPolygonShape(*c.transform).size() == 0)
+            continue;
+        //remove
+
         auto aabb = c.collider->getAABB(*c.transform);
         all.push_back({aabb.min.x, c});
         all.push_back({aabb.max.x, c});

@@ -32,22 +32,23 @@ std::vector<bool> findEdges(const std::vector<vec2f>& points, AABB seg) {
     }
     return result;
 }
-static std::vector<vec2f> smoothAdjacentRays(const std::vector<vec2f>& points, AABB seg) {
-    std::vector<vec2f> new_set;
-    auto isEdge = findEdges(points, seg);
+static void smoothAdjacentRays(std::vector<vec2f>& points) {
     for(int i = 0; i < points.size(); i++) {
-        vec2f first = points[i];
-        vec2f cur = points[(i + 1) % points.size()];
-        if(isEdge[(i + 1) % points.size()] || isEdge[i]) {
-            new_set.push_back(first);
-        } else {
-            new_set.push_back((first + cur) * 0.5f);
+
+        vec2f& first = points[i];
+        vec2f& mid   = points[(i + 1 ) % points.size()];
+        vec2f& last  = points[(i + 2 ) % points.size()];
+
+        auto closest = findClosestPointOnRay(first, last - first, mid);
+        if(qlen(closest - mid) < 0.7f) {
+            points.erase(points.begin() + (i + 1 ) % points.size());
+            i--;
         }
     }
-    return new_set;
 }
 std::vector<vec2f> convertToPoints(const std::vector<std::pair<vec2f, vec2f>>& pairs) {
     std::vector<vec2f> result;
+    auto last = pairs.back();
     for(auto p : pairs) {
         result.push_back(p.first);
     }
@@ -63,13 +64,10 @@ std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
     for(auto& set : point_sets) {
         mergeAdjacentRays(set);
     }
-    int smooth_steps = 0;
+    int smooth_steps = 1;
     for(int i = 0 ; i < smooth_steps; i++) {
         for(auto& set : point_sets) {
-            set = smoothAdjacentRays(set, seg);
-        }
-        for(auto& set : point_sets) {
-            mergeAdjacentRays(set);
+            smoothAdjacentRays(set);
         }
     }
     return point_sets;
@@ -180,8 +178,14 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
     int xincr = (last_tick_updated % 2 == 0 ? 1 : -1);
     int xbegin = seg.left() - 1;
     int xend = seg.right() + 1;
-    if(seg.hasColliderChanged)
-        segment_outlines[index] = m_extractPolygon(seg);
+    if(seg.hasColliderChanged) {
+        seg.hasColliderChanged = false;
+        auto itr = segment_outlines.begin();
+        for(int i = 0; i < index; i++) itr++;
+        auto shape = m_extractPolygon(seg);
+        itr->collider.setShape(shape);
+        itr->transform.setPos(shape.getPos());
+    }
 
     for (int y = (yinv ? ybegin : yend); y <= yend && y >= ybegin; y += yincr) {
         for (int x = (last_tick_updated % 2 == 0 ? xbegin : xend);

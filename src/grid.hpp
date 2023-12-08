@@ -7,16 +7,41 @@
 #include "SFML/Graphics/Sprite.hpp"
 #include "SFML/Graphics/Texture.hpp"
 #include "cell.hpp"
+#include "physics/collider.hpp"
+#include "physics/material.hpp"
+#include "physics/physics_manager.hpp"
+#include "physics/rigidbody.hpp"
 #include "types.hpp"
 #include <iostream>
+#include <list>
 #include <map>
 #include <random>
 #include <unordered_map>
 #include <vector>
 
 #define SEGMENT_SIZE 32
+
 namespace epi {
-    class ParticleManager;
+class ParticleManager;
+
+struct SegmentDynamicObject {
+    Transform transform;
+    Collider collider;
+    Rigidbody rigidbody;
+    Material material ;
+    RigidManifold getManifold() {
+        RigidManifold  man;
+        man.collider  = &collider;
+        man.rigidbody = &rigidbody;
+        man.material  = &material;
+        man.transform = &transform;
+        return man;
+    }
+    SegmentDynamicObject(ConcavePolygon concave = ConcavePolygon({})) : collider(concave) {
+        transform.setPos(concave.getPos());
+        rigidbody.isStatic = true;
+    }
+};
 class Grid {
     std::vector<Cell> world;
     struct SegmentT : public AABB {
@@ -33,7 +58,7 @@ class Grid {
     std::vector<std::vector<vec2f>> m_extractPolygonPoints(AABB seg);
     ConcavePolygon m_extractPolygon(AABB seg);
 public:
-    std::vector<ConcavePolygon> segment_outlines;
+    std::list<SegmentDynamicObject> segment_outlines;
     sf::Image img;
     const size_t width;
     const size_t height;
@@ -53,11 +78,14 @@ public:
         return y * width + x; 
     }
 
-    Grid(size_t w, size_t h)
+    Grid(size_t w, size_t h, PhysicsManager& phy_manager)
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
     {
         current_segments = std::vector<SegmentT>(segmentsWidth() * segmentsHeight());
-        segment_outlines = std::vector<ConcavePolygon>(segmentsWidth() * segmentsHeight(), ConcavePolygon({}));
+        segment_outlines = std::list<SegmentDynamicObject>(segmentsWidth() * segmentsHeight());
+        for(auto& seg : segment_outlines) {
+            phy_manager.add(seg.getManifold());
+        }
         for(int x = 0; x < width; x++) {
             for(int y = 0; y < height; y++) {
                 if(x == 0 || y == 0 || x == width - 1 || y == height - 1) {
@@ -80,7 +108,6 @@ public:
         for(auto& t : current_segments) {
             t.min = {0xffffff, 0xffffff};
             t.max = {-1, -1};
-            t.hasColliderChanged = false;
         }
         
         auto rng = std::default_random_engine{};
@@ -89,6 +116,7 @@ public:
         size_t idx = 0;
         for(auto& t : last_segments) {
             m_updateSegment(t, idx++);
+            t.hasColliderChanged = false;
         }
         last_tick_updated++;
     }
