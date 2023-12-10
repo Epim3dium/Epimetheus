@@ -136,6 +136,10 @@ std::vector<CollisionInfo> DefaultSolver::detect(Transform* trans1, Collider* co
     std::vector<CollisionInfo> result;
     for(const auto& poly1 : col1->getPolygonShape(*trans1)) {
         for(const auto& poly2 : col2->getPolygonShape(*trans2)) {
+            auto aabb1 = AABB::CreateFromVerticies(poly1.getVertecies());
+            auto aabb2 = AABB::CreateFromVerticies(poly2.getVertecies());
+            if(!isOverlappingAABBAABB(aabb1, aabb2))
+                continue;
             result.push_back(detectOverlap(poly1, poly2));
         }
     }

@@ -65,10 +65,10 @@ public:
     size_t last_tick_updated = 1;
 
     inline size_t segmentsWidth() const {
-        return width / SEGMENT_SIZE + 1;
+        return width / SEGMENT_SIZE;
     }
     inline size_t segmentsHeight() const {
-        return height / SEGMENT_SIZE + 1;
+        return height / SEGMENT_SIZE;
     }
     inline size_t m_idx(int x, int y) const { 
         assert(y < height);
@@ -93,10 +93,16 @@ public:
                 }
             }
         }
+        auto itr = segment_outlines.begin();
         for(int y = 0; y < segmentsHeight(); y++) {
             for(int x = 0; x < segmentsWidth(); x++) {
+                auto shape = m_extractPolygon({vec2f(x, y) * (float)SEGMENT_SIZE + vec2f(1.f, 1.f), vec2f(x + 1., y + 1.) * (float)SEGMENT_SIZE - vec2f(1.f, 1.f)});
+                itr->collider.setShape(shape);
+                itr->transform.setPos(shape.getPos());
+
                 current_segments[y * segmentsWidth() + x].max = {-1, -1};
                 current_segments[y * segmentsWidth() + x].min = {-1, -1};
+                itr++;
             }
         }
         last_segments = current_segments;

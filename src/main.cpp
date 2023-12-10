@@ -101,7 +101,7 @@ public:
         return true;
     }
     void onUpdate() override {
-        int brush_size = 10;
+        int brush_size = 20;
         sf::Keyboard::Key cur_key = sf::Keyboard::F12;
         bool isDrawing = false;
         auto drawMaterial = [&](sf::Keyboard::Key key, eCellType type) {
@@ -189,7 +189,7 @@ public:
             auto px_size = pixelSize(window.getSize());
             return vec2f(grid_pos.x * px_size, window.getSize().y - grid_pos.y * px_size);
         };
-        for(const auto& object : dynamic_objects) {
+        for(auto& object : dynamic_objects) {
             for(auto poly : object.collider.getPolygonShape(object.transform)) {
                 auto points = poly.getVertecies();
 
@@ -203,20 +203,20 @@ public:
                 }
             }
         }
-        for(const auto& object : grid.segment_outlines) {
-            for(auto poly : object.collider.getPolygonShape(object.transform)) {
-                auto points = poly.getVertecies();
-
-                sf::Vertex vert[2];
-                vert[0].color = vert[1].color = sf::Color::Cyan;
-                vert[0].position = getScreenPos(points.back());
-                for(auto& p : points) {
-                    vert[1].position = getScreenPos(p);
-                    window.draw(vert, 2U, sf::Lines);
-                    vert[0] = vert[1];
-                }
-            }
-        }
+        // for(auto& object : grid.segment_outlines) {
+        //     for(auto poly : object.collider.getPolygonShape(object.transform)) {
+        //         auto points = poly.getVertecies();
+        //
+        //         sf::Vertex vert[2];
+        //         vert[0].color = vert[1].color = sf::Color::Cyan;
+        //         vert[0].position = getScreenPos(points.back());
+        //         for(auto& p : points) {
+        //             vert[1].position = getScreenPos(p);
+        //             window.draw(vert, 2U, sf::Lines);
+        //             vert[0] = vert[1];
+        //         }
+        //     }
+        // }
 
         ImGui::Begin("options");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",

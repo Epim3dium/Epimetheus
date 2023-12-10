@@ -74,7 +74,8 @@ std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
 }
 ConcavePolygon Grid::m_extractPolygon(AABB seg) {
     std::vector<ConvexPolygon> all_polygons;
-    for(auto points : m_extractPolygonPoints(seg)) {
+    auto all_points = m_extractPolygonPoints(seg);
+    for(auto points : all_points) {
         auto triangles = toTriangles(points);
         auto polygons = toBiggestConvexPolygons(triangles);
         all_polygons.insert(all_polygons.end(), polygons.begin(), polygons.end());
@@ -172,20 +173,15 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
         return;
     }
     bool yinv = (last_tick_updated % 4 == 0 || last_tick_updated % 3 == 0);
+
     int yincr = (yinv ? 1 : -1);
     int ybegin = seg.bottom() - 1;
     int yend = seg.top() + 1;
+
     int xincr = (last_tick_updated % 2 == 0 ? 1 : -1);
     int xbegin = seg.left() - 1;
     int xend = seg.right() + 1;
-    if(seg.hasColliderChanged) {
-        seg.hasColliderChanged = false;
-        auto itr = segment_outlines.begin();
-        for(int i = 0; i < index; i++) itr++;
-        auto shape = m_extractPolygon(seg);
-        itr->collider.setShape(shape);
-        itr->transform.setPos(shape.getPos());
-    }
+
 
     for (int y = (yinv ? ybegin : yend); y <= yend && y >= ybegin; y += yincr) {
         for (int x = (last_tick_updated % 2 == 0 ? xbegin : xend);
@@ -198,6 +194,17 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
                 Cell::g_updates[static_cast<size_t>(world[m_idx(x, y)].type)];
             func(*this, {x, y});
         }
+    }
+    int base_x = seg.center().x / SEGMENT_SIZE;
+    int base_y = seg.center().y / SEGMENT_SIZE;
+    auto cur_changed = current_segments[base_y * segmentsWidth() + base_x].hasColliderChanged;
+    if((seg.hasColliderChanged && !cur_changed) || last_tick_updated % 5 == 0) {
+        seg.hasColliderChanged = false;
+        auto itr = segment_outlines.begin();
+        for(int i = 0; i < index; i++) itr++;
+        auto shape = m_extractPolygon(seg);
+        itr->collider.setShape(shape);
+        itr->transform.setPos(shape.getPos());
     }
 }
 void Grid::convertFloatingParticles(ParticleManager& manager) {

@@ -39,6 +39,8 @@ struct ColliderEvent {
 class Collider : public Signal::Subject<ColliderEvent> {
     float m_inertia_dev_mass = -1.f;
     ConcavePolygon shape;
+    vec2f cached_pos = {NAN, NAN};
+    float cached_rot = NAN;
 public:
     void setShape(ConcavePolygon new_shape) {
         //TODO
@@ -53,11 +55,14 @@ public:
     float time_immobile = 0.f;
     bool isSleeping = false;
 
-    std::vector<ConvexPolygon> getPolygonShape(const Transform& trans) const {
-        auto t = shape;
-        t.setPos(trans.getPos());
-        t.setRot(trans.getRot());
-        return t.getPolygons();
+    std::vector<ConvexPolygon> getPolygonShape(const Transform& trans) {
+        if(trans.getPos() != cached_pos || trans.getRot() != cached_rot) {
+            shape.setPos(trans.getPos());
+            shape.setRot(trans.getRot());
+            cached_rot = trans.getRot();
+            cached_pos = trans.getPos();
+        }
+        return shape.getPolygons();
     }
 
     virtual AABB getAABB(Transform& trans) { 
