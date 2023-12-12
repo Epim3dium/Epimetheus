@@ -13,16 +13,6 @@ namespace epi {
 std::vector<ConvexPolygon> toTriangles(const std::vector<vec2f>& points) {
     std::vector<ConvexPolygon> result;
     std::vector<vec2f> tmp = points;
-    float angle_counter = 0.f;
-    for(int i = 0; i < tmp.size(); i++) {
-        auto first = tmp[i];
-        auto mid = tmp[(i + 1) % tmp.size()];
-        auto last = tmp[(i + 2) % tmp.size()];
-        angle_counter += angleAround(first, mid, last);
-    }
-    if(angle_counter < 0.f) {
-        std::reverse(tmp.begin(), tmp.end());
-    }
     while(result.size() != points.size() - 2) {
         size_t res_size_last = result.size();
         for(int i = 0; i < tmp.size(); i++) {

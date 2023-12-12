@@ -56,7 +56,9 @@ public:
 
     struct {
         std::vector<vec2f> rigid_construct_points;
+        int brush_size = 20;
     }opt;
+
     float pixelSize(const sf::Vector2u size) const {
         float scalar = 1.f;
         if (size.x < size.y) {
@@ -101,7 +103,6 @@ public:
         return true;
     }
     void onUpdate() override {
-        int brush_size = 20;
         sf::Keyboard::Key cur_key = sf::Keyboard::F12;
         bool isDrawing = false;
         auto drawMaterial = [&](sf::Keyboard::Key key, eCellType type) {
@@ -112,8 +113,8 @@ public:
             mouse_pos.x /= px_size;
             mouse_pos.y /= px_size;
             Cell c(type);
-            for(int i = -brush_size / 2; i < brush_size / 2; i++) 
-                for(int ii = -brush_size / 2; ii < brush_size / 2; ii++) 
+            for(int i = -opt.brush_size / 2; i < opt.brush_size / 2; i++) 
+                for(int ii = -opt.brush_size / 2; ii < opt.brush_size / 2; ii++) 
                     grid.set({(int)mouse_pos.x + i , static_cast<int>(grid.height - (int)mouse_pos.y - 1 + ii)}, c);
         };
         drawMaterial(sf::Keyboard::S, eCellType::Sand);
@@ -126,7 +127,7 @@ public:
             mouse_pos.x /= px_size;
             mouse_pos.y /= px_size;
             mouse_pos.y = grid.height - mouse_pos.y - 1;
-            const float spawn_size = 5.0f;
+            float spawn_size = opt.brush_size / 2.f;
             auto force = vec2f(getMousePos() - last_mouse_pos) * 2000.f;
             force.y *= -1;
             static int ticks  = 0;
@@ -203,20 +204,21 @@ public:
                 }
             }
         }
-        // for(auto& object : grid.segment_outlines) {
-        //     for(auto poly : object.collider.getPolygonShape(object.transform)) {
-        //         auto points = poly.getVertecies();
-        //
-        //         sf::Vertex vert[2];
-        //         vert[0].color = vert[1].color = sf::Color::Cyan;
-        //         vert[0].position = getScreenPos(points.back());
-        //         for(auto& p : points) {
-        //             vert[1].position = getScreenPos(p);
-        //             window.draw(vert, 2U, sf::Lines);
-        //             vert[0] = vert[1];
-        //         }
-        //     }
-        // }
+        for(auto& object : grid.terrain_objects.segment_colliders) {
+            for(auto poly : object.collider.getPolygonShape(object.transform)) {
+                auto points = poly.getVertecies();
+                auto points_size = points.size();
+        
+                sf::Vertex vert[2];
+                vert[0].color = vert[1].color = sf::Color::White;
+                vert[0].position = getScreenPos(points.back());
+                for(auto& p : points) {
+                    vert[1].position = getScreenPos(p);
+                    window.draw(vert, 2U, sf::Lines);
+                    vert[0] = vert[1];
+                }
+            }
+        }
 
         ImGui::Begin("options");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",

@@ -27,19 +27,16 @@ class ParticleManager;
 struct SegmentDynamicObject {
     Transform transform;
     Collider collider;
-    Rigidbody rigidbody;
-    Material material ;
-    RigidManifold getManifold() {
+    RigidManifold getManifold(Rigidbody& rb, Material& mat) {
         RigidManifold  man;
         man.collider  = &collider;
-        man.rigidbody = &rigidbody;
-        man.material  = &material;
         man.transform = &transform;
+        man.rigidbody = &rb;
+        man.material = &mat;
         return man;
     }
     SegmentDynamicObject(ConcavePolygon concave = ConcavePolygon({})) : collider(concave) {
         transform.setPos(concave.getPos());
-        rigidbody.isStatic = true;
     }
 };
 class Grid {
@@ -58,7 +55,12 @@ class Grid {
     std::vector<std::vector<vec2f>> m_extractPolygonPoints(AABB seg);
     ConcavePolygon m_extractPolygon(AABB seg);
 public:
-    std::list<SegmentDynamicObject> segment_outlines;
+    struct {
+        std::list<SegmentDynamicObject> segment_colliders;
+        Rigidbody rigidbody;
+        Material material ;
+    }terrain_objects;
+
     sf::Image img;
     const size_t width;
     const size_t height;
@@ -82,18 +84,34 @@ public:
         : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
     {
         current_segments = std::vector<SegmentT>(segmentsWidth() * segmentsHeight());
-        segment_outlines = std::list<SegmentDynamicObject>(segmentsWidth() * segmentsHeight());
-        for(auto& seg : segment_outlines) {
-            phy_manager.add(seg.getManifold());
+
+        terrain_objects.rigidbody.isStatic = true;
+        terrain_objects.material.sfriction = 1.0;
+        terrain_objects.material.dfriction = 1.0;
+        terrain_objects.segment_colliders = std::list<SegmentDynamicObject>(segmentsWidth() * segmentsHeight());
+
+        for(auto& seg : terrain_objects.segment_colliders) {
+            phy_manager.add(seg.getManifold(terrain_objects.rigidbody, terrain_objects.material));
         }
-        for(int x = 0; x < width; x++) {
+        auto forRow = [&](const int row) {
             for(int y = 0; y < height; y++) {
-                if(x == 0 || y == 0 || x == width - 1 || y == height - 1) {
-                    set({x, y}, Cell(eCellType::Bedrock));
-                }
+                set({row, y}, Cell(eCellType::Bedrock));
             }
-        }
-        auto itr = segment_outlines.begin();
+        };
+        auto forCol = [&](const int col) {
+            for(int x = 0; x < width; x++) {
+                set({x, col}, Cell(eCellType::Bedrock));
+            }
+        };
+        forRow(0);
+        forRow(1);
+        forRow(width - 1);
+        forRow(width - 2);
+        forCol(0);
+        forCol(1);
+        forCol(width - 1);
+        forCol(width - 2);
+        auto itr = terrain_objects.segment_colliders.begin();
         for(int y = 0; y < segmentsHeight(); y++) {
             for(int x = 0; x < segmentsWidth(); x++) {
                 auto shape = m_extractPolygon({vec2f(x, y) * (float)SEGMENT_SIZE + vec2f(1.f, 1.f), vec2f(x + 1., y + 1.) * (float)SEGMENT_SIZE - vec2f(1.f, 1.f)});
@@ -153,8 +171,8 @@ public:
             for (int y = t.min.y - 1; y <= t.max.y + 1; y++) {
                 for (int x = t.min.x - 1; x <= t.max.x + 1; x++) {
                     auto color = get(x, y).color;
-                    if(get(x, y).isFloating)
-                        color = sf::Color::Red;
+                    // if(get(x, y).isFloating)
+                    //     color = sf::Color::Red;
                     img.setPixel(x, y, color);
                 }
             }

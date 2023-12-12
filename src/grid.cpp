@@ -21,29 +21,35 @@ static void mergeAdjacentRays(std::vector<vec2f>& points) {
         }
     }
 }
-std::vector<bool> findEdges(const std::vector<vec2f>& points, AABB seg) {
-    std::vector<bool> result;
-    for(auto p : points) {
-        if(p.x == seg.left() || p.x == seg.right() || p.y == seg.bottom() || p.y == seg.top()) {
-            result.push_back(true);
-        }else {
-            result.push_back(false);
+template<class Iter>
+static std::vector<vec2f> smoothAdjacentRays(Iter points_begin, Iter points_end, float epsilon = 0.85f) {
+    assert(points_begin < points_end);
+    if(points_end - points_begin == 1) {
+        return {*points_begin};
+    }
+
+    Iter cur_point;
+    auto points_back = std::prev(points_end);
+
+    float dmax = 0.f;
+    auto ray_origin = *points_begin;
+    auto ray_dir = *points_back - *points_begin;
+    for(auto itr = std::next(points_begin); itr < points_back; itr++) {
+        auto cur = *itr;
+        auto closest = findClosestPointOnRay(ray_origin, ray_dir, cur);
+        auto d= qlen(closest - *itr);
+        if(d > dmax) {
+            dmax = d;
+            cur_point = itr;
         }
     }
-    return result;
-}
-static void smoothAdjacentRays(std::vector<vec2f>& points) {
-    for(int i = 0; i < points.size(); i++) {
-
-        vec2f& first = points[i];
-        vec2f& mid   = points[(i + 1 ) % points.size()];
-        vec2f& last  = points[(i + 2 ) % points.size()];
-
-        auto closest = findClosestPointOnRay(first, last - first, mid);
-        if(qlen(closest - mid) < 0.7f) {
-            points.erase(points.begin() + (i + 1 ) % points.size());
-            i--;
-        }
+    if(dmax > epsilon) {
+        auto r1 = smoothAdjacentRays(points_begin, cur_point,  epsilon);
+        auto r2 = smoothAdjacentRays(cur_point,    points_end, epsilon);
+        r1.insert(r1.end(), r2.begin(), r2.end());
+        return r1;
+    }else {
+        return {*points_begin, *points_back};
     }
 }
 std::vector<vec2f> convertToPoints(const std::vector<std::pair<vec2f, vec2f>>& pairs) {
@@ -64,10 +70,10 @@ std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
     for(auto& set : point_sets) {
         mergeAdjacentRays(set);
     }
-    int smooth_steps = 1;
+    int smooth_steps = 3;
     for(int i = 0 ; i < smooth_steps; i++) {
         for(auto& set : point_sets) {
-            smoothAdjacentRays(set);
+            set = smoothAdjacentRays(set.begin(), set.end());
         }
     }
     return point_sets;
@@ -75,6 +81,7 @@ std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
 ConcavePolygon Grid::m_extractPolygon(AABB seg) {
     std::vector<ConvexPolygon> all_polygons;
     auto all_points = m_extractPolygonPoints(seg);
+
     for(auto points : all_points) {
         auto triangles = toTriangles(points);
         auto polygons = toBiggestConvexPolygons(triangles);
@@ -115,7 +122,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
         if(isCellColliderEligable(cell)) {
             for(auto check : checks) {
                 if(yoff == check.local_border.y || xoff == check.local_border.x) {
-                    path[yoff + check.to.y][xoff + check.to.x] = check.from + vec2i(xoff, yoff);
+                    path[yoff + check.from.y][xoff + check.from.x] = check.to + vec2i(xoff, yoff);
                 }
             }
         }else {
@@ -124,7 +131,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
                 if(yoff != check.local_border.y && xoff != check.local_border.x 
                         && isCellColliderEligable(cell)) 
                 {
-                    path[yoff + check.from.y][xoff + check.from.x] = check.to + vec2i(xoff, yoff);
+                    path[yoff + check.to.y][xoff + check.to.x] = check.from + vec2i(xoff, yoff);
                 }
             }
         }
@@ -195,12 +202,11 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
             func(*this, {x, y});
         }
     }
-    int base_x = seg.center().x / SEGMENT_SIZE;
-    int base_y = seg.center().y / SEGMENT_SIZE;
-    auto cur_changed = current_segments[base_y * segmentsWidth() + base_x].hasColliderChanged;
-    if((seg.hasColliderChanged && !cur_changed) || last_tick_updated % 5 == 0) {
+
+    auto cur_changed = current_segments[index].hasColliderChanged;
+    if((seg.hasColliderChanged && !cur_changed) || last_tick_updated % 10 == 0) {
         seg.hasColliderChanged = false;
-        auto itr = segment_outlines.begin();
+        auto itr = terrain_objects.segment_colliders.begin();
         for(int i = 0; i < index; i++) itr++;
         auto shape = m_extractPolygon(seg);
         itr->collider.setShape(shape);
