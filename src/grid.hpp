@@ -87,7 +87,7 @@ public:
 
         terrain_objects.rigidbody.isStatic = true;
         terrain_objects.material.sfriction = 1.0;
-        terrain_objects.material.dfriction = 1.0;
+        terrain_objects.material.dfriction = 0.8;
         terrain_objects.segment_colliders = std::list<SegmentDynamicObject>(segmentsWidth() * segmentsHeight());
 
         for(auto& seg : terrain_objects.segment_colliders) {

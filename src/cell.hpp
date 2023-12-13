@@ -5,6 +5,7 @@
 namespace epi {
 enum class eCellType {
     Bedrock,
+    Stone,
     Air,
     Sand,
     Water,

@@ -17,12 +17,12 @@ static void mergeAdjacentRays(std::vector<vec2f>& points) {
         if(normal(b0 - a0) == normal(b1 - a1)) {
             a1 = a0;
             points.erase(points.begin() + (i + 1 ) % points.size());
-            i--;
+            i -= 1;
         }
     }
 }
 template<class Iter>
-static std::vector<vec2f> smoothAdjacentRays(Iter points_begin, Iter points_end, float epsilon = 0.85f) {
+static std::vector<vec2f> smoothPointsPuecker(Iter points_begin, Iter points_end, float epsilon) {
     assert(points_begin < points_end);
     if(points_end - points_begin == 1) {
         return {*points_begin};
@@ -44,13 +44,16 @@ static std::vector<vec2f> smoothAdjacentRays(Iter points_begin, Iter points_end,
         }
     }
     if(dmax > epsilon) {
-        auto r1 = smoothAdjacentRays(points_begin, cur_point,  epsilon);
-        auto r2 = smoothAdjacentRays(cur_point,    points_end, epsilon);
+        auto r1 = smoothPointsPuecker(points_begin, cur_point,  epsilon);
+        auto r2 = smoothPointsPuecker(cur_point,    points_end, epsilon);
         r1.insert(r1.end(), r2.begin(), r2.end());
         return r1;
     }else {
         return {*points_begin, *points_back};
     }
+}
+static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 0.80f) {
+    return smoothPointsPuecker(points.begin(), points.end(), epsilon);
 }
 std::vector<vec2f> convertToPoints(const std::vector<std::pair<vec2f, vec2f>>& pairs) {
     std::vector<vec2f> result;
@@ -62,29 +65,29 @@ std::vector<vec2f> convertToPoints(const std::vector<std::pair<vec2f, vec2f>>& p
 }
 
 std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
-    auto ray_sets = m_extractRayGroups(seg);
-    std::vector<std::vector<vec2f>> point_sets;
-    for(auto& set : ray_sets) {
-        point_sets.push_back(convertToPoints(set));
+    auto ray_groups = m_extractRayGroups(seg);
+    std::vector<std::vector<vec2f>> point_islands;
+    for(auto& group : ray_groups) {
+        point_islands.push_back(convertToPoints(group));
     }
-    for(auto& set : point_sets) {
-        mergeAdjacentRays(set);
+    for(auto& island : point_islands) {
+        mergeAdjacentRays(island);
     }
-    int smooth_steps = 3;
+    int smooth_steps = 5;
     for(int i = 0 ; i < smooth_steps; i++) {
-        for(auto& set : point_sets) {
-            set = smoothAdjacentRays(set.begin(), set.end());
+        for(auto& island : point_islands) {
+            island = smoothPoints(island);
         }
     }
-    return point_sets;
+    return point_islands;
 }
 ConcavePolygon Grid::m_extractPolygon(AABB seg) {
     std::vector<ConvexPolygon> all_polygons;
     auto all_points = m_extractPolygonPoints(seg);
 
     for(auto points : all_points) {
-        auto triangles = toTriangles(points);
-        auto polygons = toBiggestConvexPolygons(triangles);
+        auto triangles = triangulate(points);
+        auto polygons = partitionConvex(triangles);
         all_polygons.insert(all_polygons.end(), polygons.begin(), polygons.end());
     }
     return  ConcavePolygon(all_polygons);
@@ -204,7 +207,7 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
     }
 
     auto cur_changed = current_segments[index].hasColliderChanged;
-    if((seg.hasColliderChanged && !cur_changed) || last_tick_updated % 10 == 0) {
+    if((seg.hasColliderChanged && !cur_changed) || (last_tick_updated + index) % 10 == 0) {
         seg.hasColliderChanged = false;
         auto itr = terrain_objects.segment_colliders.begin();
         for(int i = 0; i < index; i++) itr++;

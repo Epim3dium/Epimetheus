@@ -114,13 +114,13 @@ IntersectionRayPolygonResult intersectRayPolygon(vec2f ray_origin, vec2f ray_dir
 }
 vec2f findClosestPointOnRay(vec2f ray_origin, vec2f ray_dir, vec2f point) {
     float ray_dir_len = length(ray_dir);
-    vec2f seg_v_unit = ray_dir / ray_dir_len;
-    float proj = dot(point - ray_origin, seg_v_unit);
+    vec2f ray_dir_normal = ray_dir / ray_dir_len;
+    float proj = dot(point - ray_origin, ray_dir_normal);
     if (proj <= 0)
         return ray_origin;
     if (proj >= ray_dir_len)
         return ray_origin + ray_dir;
-    return seg_v_unit * proj + ray_origin;
+    return ray_dir_normal * proj + ray_origin;
 }
 vec2f findClosestPointOnEdge(vec2f point, const ConvexPolygon& poly) {
     vec2f closest(INFINITY, INFINITY);

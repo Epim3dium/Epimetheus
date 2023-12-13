@@ -121,8 +121,8 @@ struct Triangle {
     vec2f b;
     vec2f c;
 };
-std::vector<ConvexPolygon> toTriangles(const std::vector<vec2f>& points);
-std::vector<ConvexPolygon> toBiggestConvexPolygons(const std::vector<ConvexPolygon>& polygons);
+std::vector<ConvexPolygon> triangulate(const std::vector<vec2f>& points);
+std::vector<ConvexPolygon> partitionConvex(const std::vector<ConvexPolygon>& polygons);
 struct Circle {
 
     vec2f pos;
@@ -233,20 +233,7 @@ public:
     const std::vector<ConvexPolygon>& getPolygons() const {
         return m_polygons;
     }
-    ConcavePolygon(std::vector<ConvexPolygon> polygons) {
-        vec2f avg_pos;
-        for(const auto& p : polygons) {
-            avg_pos += p.getPos();
-        }
-        avg_pos = avg_pos / static_cast<float>(polygons.size());
-        for(auto& p : polygons) {
-            p.setPos(p.getPos() - avg_pos);
-        }
-        pos = avg_pos;
-        m_model = polygons;
-        m_polygons = m_model;
-        m_updatePolys();
-    }
+    ConcavePolygon(std::vector<ConvexPolygon> polygons);
 
 };
 

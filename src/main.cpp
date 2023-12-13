@@ -34,9 +34,23 @@ struct DynamicObject {
     static DynamicObject create(ConvexPolygon poly) {
         return DynamicObject(ConcavePolygon({poly}));
     }
+    static void sortClockWise(std::vector<vec2f>& points) {
+        int sign = 0;
+        for(int i = 0; i < points.size(); i++) {
+            auto first = points[i];
+            auto mid = points[(i + 1) % points.size()];
+            auto last = points[(i + 2) % points.size()];
+            float angle = angleAround(first, mid, last);
+            sign += angle > 0.f ? 1 : -1;
+        }
+        if(sign < 0) {
+            std::reverse(points.begin(), points.end());
+        }
+    }
     static DynamicObject create(std::vector<vec2f> points) {
-        auto triangles = toTriangles(points);
-        auto polygons = toBiggestConvexPolygons(triangles);
+        sortClockWise(points);
+        auto triangles = triangulate(points);
+        auto polygons = partitionConvex(triangles);
         ConcavePolygon concave_poly(polygons);
         return DynamicObject(concave_poly);
     }
@@ -57,6 +71,7 @@ public:
     struct {
         std::vector<vec2f> rigid_construct_points;
         int brush_size = 20;
+        bool showColliderEdges = true;
     }opt;
 
     float pixelSize(const sf::Vector2u size) const {
@@ -100,6 +115,13 @@ public:
                     opt.rigid_construct_points.push_back(mouse_pos);
                 }
             });
+        event_handler.addCallback(sf::Event::MouseWheelScrolled, 
+            [&](const sf::Event& e) {
+                if(e.mouseWheelScroll.delta  > 0.f)
+                    opt.brush_size += 1;
+                if(e.mouseWheelScroll.delta  < 0.f)
+                    opt.brush_size -= 1;
+            });
         return true;
     }
     void onUpdate() override {
@@ -118,7 +140,7 @@ public:
                     grid.set({(int)mouse_pos.x + i , static_cast<int>(grid.height - (int)mouse_pos.y - 1 + ii)}, c);
         };
         drawMaterial(sf::Keyboard::S, eCellType::Sand);
-        drawMaterial(sf::Keyboard::Z, eCellType::Bedrock);
+        drawMaterial(sf::Keyboard::Z, eCellType::Stone);
         drawMaterial(sf::Keyboard::X, eCellType::Air);
         static vec2i last_mouse_pos = getMousePos();
         if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
@@ -178,6 +200,35 @@ public:
         //         drawFill(downscaled, poly, sf::Color::White);
         //     }
         // }
+        {
+            auto mouse_pos = getMousePos();
+            auto px_size = pixelSize(getSize());
+            mouse_pos.x /= px_size;
+            mouse_pos.y /= px_size;
+            for(int i = -opt.brush_size / 2; i < opt.brush_size / 2; i++)  {
+                for(int ii = -opt.brush_size / 2; ii < opt.brush_size / 2; ii++)  {
+                    sf::Vertex vert;
+                    vert.position = vec2f(mouse_pos.x + i + 1, static_cast<int>(grid.height - (int)mouse_pos.y - 1 + ii));
+                    vert.color = sf::Color::White;
+                    vert.color.a = 64;
+                    downscaled.draw(&vert, 1U, sf::Points);
+                }
+            }
+        }
+        for(auto& object : dynamic_objects) {
+            for(const auto& poly : object.collider.getPolygonShape(object.transform)) {
+                auto points = poly.getVertecies();
+
+                sf::Vertex vert[points.size()];
+                size_t idx = 0;
+                for(auto& p : points) {
+                    vert[idx].position = p;
+                    vert[idx].color = sf::Color::Cyan;
+                    idx++;
+                }
+                downscaled.draw(vert, points.size(), sf::TrianglesFan);
+            }
+        }
 
         sf::Sprite spr;
         spr.setPosition(0, 0);
@@ -190,19 +241,20 @@ public:
             auto px_size = pixelSize(window.getSize());
             return vec2f(grid_pos.x * px_size, window.getSize().y - grid_pos.y * px_size);
         };
+        if(opt.showColliderEdges) {
         for(auto& object : dynamic_objects) {
-            for(auto poly : object.collider.getPolygonShape(object.transform)) {
-                auto points = poly.getVertecies();
-
-                sf::Vertex vert[2];
-                vert[0].color = vert[1].color = sf::Color::Cyan;
-                vert[0].position = getScreenPos(points.back());
-                for(auto& p : points) {
-                    vert[1].position = getScreenPos(p);
-                    window.draw(vert, 2U, sf::Lines);
-                    vert[0] = vert[1];
-                }
-            }
+             for(auto poly : object.collider.getPolygonShape(object.transform)) {
+                 auto points = poly.getVertecies();
+        
+                 sf::Vertex vert[2];
+                 vert[0].color = vert[1].color = sf::Color::Magenta;
+                 vert[0].position = getScreenPos(points.back());
+                 for(auto& p : points) {
+                     vert[1].position = getScreenPos(p);
+                     window.draw(vert, 2U, sf::Lines);
+                     vert[0] = vert[1];
+                 }
+             }
         }
         for(auto& object : grid.terrain_objects.segment_colliders) {
             for(auto poly : object.collider.getPolygonShape(object.transform)) {
@@ -218,6 +270,7 @@ public:
                     vert[0] = vert[1];
                 }
             }
+        }
         }
 
         ImGui::Begin("options");
