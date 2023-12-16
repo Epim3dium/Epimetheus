@@ -3,6 +3,15 @@
 #include "particles.hpp"
 #include "types.hpp"
 namespace epi {
+static auto shiftCyclic(size_t offset, const std::vector<vec2f>& points) {
+    std::vector<vec2f> result(points.size());
+    size_t index = 0;
+    while(index != points.size()) {
+        result[index] = points[(index + offset) % points.size()];
+        index++;
+    }
+    return result;
+}
 static void mergeAdjacentRays(std::vector<vec2f>& points) {
     for(int i = 0; i < points.size(); i++) {
 
@@ -52,8 +61,11 @@ static std::vector<vec2f> smoothPointsPuecker(Iter points_begin, Iter points_end
         return {*points_begin, *points_back};
     }
 }
-static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 0.80f) {
-    return smoothPointsPuecker(points.begin(), points.end(), epsilon);
+static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 2.85f) {
+    auto result = smoothPointsPuecker(points.begin(), points.end(), epsilon);
+    if(result.size() < 3)
+        return points;
+    return result;
 }
 std::vector<vec2f> convertToPoints(const std::vector<std::pair<vec2f, vec2f>>& pairs) {
     std::vector<vec2f> result;
@@ -73,10 +85,11 @@ std::vector<std::vector<vec2f>> Grid::m_extractPolygonPoints(AABB seg) {
     for(auto& island : point_islands) {
         mergeAdjacentRays(island);
     }
-    int smooth_steps = 5;
+    int smooth_steps = 3;
     for(int i = 0 ; i < smooth_steps; i++) {
         for(auto& island : point_islands) {
-            island = smoothPoints(island);
+            auto shifted = shiftCyclic(island.size() / smooth_steps, island);
+            island = smoothPoints(shifted);
         }
     }
     return point_islands;

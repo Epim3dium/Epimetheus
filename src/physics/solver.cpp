@@ -30,14 +30,32 @@ void handleOverlap(RigidManifold& m1, RigidManifold& m2, const CollisionInfo& ma
         return;
     auto& t1 = *m1.transform;
     auto& t2 = *m2.transform;
+
+    constexpr float response_coef = 0.75f;
+    constexpr float pos_rot_weight = 0.7f;
+    const float offset = man.overlap * response_coef;
+
+    auto rotateByOffest = [&man](vec2f cp, Transform& t, float overlap) {
+        auto rad = t.getPos() - cp;
+        auto rad_n = normal(rad);
+        auto rot_diff = overlap / (2.f * EPI_PI * length(rad));
+        t.setRot(t.getRot() + rot_diff * cross(rad_n, man.cn));
+    };
+
     if(m2.rigidbody->isStatic) {
-        t1.setPos(t1.getPos() + man.cn * man.overlap);
+        t1.setPos(t1.getPos() + man.cn * offset * pos_rot_weight);
+
+        //for when it's 'lodged between 2 static objects'
+        for(auto cp : man.cps)
+            rotateByOffest(cp, t1, -offset * (1.f - pos_rot_weight) / static_cast<float>(man.cps.size()));
     } else if(m1.rigidbody->isStatic) {
-        t2.setPos(t2.getPos() - man.cn * man.overlap);
+        t2.setPos(t2.getPos() - man.cn * offset * pos_rot_weight);
+
+        for(auto cp : man.cps)
+            rotateByOffest(cp, t2, offset * (1.f - pos_rot_weight) / static_cast<float>(man.cps.size()));
     } else {
-        constexpr float response_coef = 0.9f;
-        t1.setPos(t1.getPos() + man.cn * man.overlap * 0.5f * response_coef);
-        t2.setPos(t2.getPos() - man.cn * man.overlap * 0.5f * response_coef);
+        t1.setPos(t1.getPos() + man.cn * offset * 0.5f);
+        t2.setPos(t2.getPos() - man.cn * offset * 0.5f);
     }
 }
 void DefaultSolver::processReaction(const CollisionInfo& info, const RigidManifold& m1, 

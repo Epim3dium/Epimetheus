@@ -15,14 +15,16 @@
 #include <map>
 #include <mutex>
 #include <memory>
+#include <random>
 #include <set>
 #include <stdexcept>
 #include <vector>
 #include <thread>
 #include <mutex>
 
-
 namespace epi {
+using std::mt19937;
+
 //from 1 to n
 //veci communities(n + 1, -1);
 
@@ -238,4 +240,4 @@ void PhysicsManager::remove(const Restraint* res) {
     unbind_any<Restraint*>((Restraint*)res, _restraints);
 }
 
-}
+} // namespace epi

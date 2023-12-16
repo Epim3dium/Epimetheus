@@ -8,7 +8,7 @@ void updateSand(Grid& g, sf::Vector2i vec) {
     int first_dir = rng.Random() > 0.5f ? 1 : -1;
     auto other_coord = vec + vec2i(0, -1);
     auto checkSwappable = [&](vec2i coord) {
-        return g.get(other_coord).getPropery().state != eState::Solid && g.get(coord).getPropery().state != eState::Powder;
+        return g.get(coord).getPropery().state != eState::Solid && g.get(coord).getPropery().state != eState::Powder;
     };
     if(checkSwappable(other_coord)) {
         auto tmp = g.get(vec);

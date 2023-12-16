@@ -74,6 +74,8 @@ public:
         bool showColliderEdges = true;
     }opt;
 
+    sf::Clock clock_processing_time;
+    double processing_time;
     float pixelSize(const sf::Vector2u size) const {
         float scalar = 1.f;
         if (size.x < size.y) {
@@ -87,6 +89,7 @@ public:
         downscaled.create(width >> GRID_DOWNSCALE, height >> GRID_DOWNSCALE);
         physics_manager.bounciness_select = PhysicsManager::eSelectMode::Max;
         physics_manager.friction_select = PhysicsManager::eSelectMode::Max;
+        physics_manager.steps = 16U;
         event_handler.addCallback(sf::Event::KeyPressed, 
             [&](const sf::Event& e) {
                 if(e.key.code == sf::Keyboard::Enter) {
@@ -125,6 +128,7 @@ public:
         return true;
     }
     void onUpdate() override {
+        clock_processing_time.restart();
         sf::Keyboard::Key cur_key = sf::Keyboard::F12;
         bool isDrawing = false;
         auto drawMaterial = [&](sf::Keyboard::Key key, eCellType type) {
@@ -184,6 +188,7 @@ public:
             }
         }
         physics_manager.update(Time::deltaTime());
+        processing_time = clock_processing_time.getElapsedTime().asSeconds();
     }
     void onRender(sf::RenderWindow& window) override {
         grid.render(downscaled);
@@ -274,8 +279,12 @@ public:
         }
 
         ImGui::Begin("options");
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-        1000.0/double(ImGui::GetIO().Framerate), double(ImGui::GetIO().Framerate));
+        auto delta_time = 1.0/double(ImGui::GetIO().Framerate);
+        ImGui::Text("Application average %.3f ms/f (%.1f FPS)",
+            delta_time * 1000.0, double(ImGui::GetIO().Framerate));
+
+        ImGui::Text("Application processing time usage: %.0f %%", processing_time / delta_time * 100.0);
+
         ImGui::Text("particle count: %zu", particle_manager.size());
         ImGui::Text("dynamic object count: %zu", dynamic_objects.size());
         ImGui::End();
