@@ -47,7 +47,7 @@ void updateWater(Grid& g, sf::Vector2i vec) {
 }
 const CellPropery Cell::properties[] = {
     {sf::Color(232, 19,  240), eState::Solid,  true},
-    {sf::Color(127, 127,  127), eState::Solid,  true},
+    {sf::Color(127, 127, 127), eState::Solid,  true},
     {sf::Color(21,  23,  87),  eState::Gas,    false},
     {sf::Color(194, 175, 83),  eState::Powder, true},
     {sf::Color(52,  108, 130), eState::Liquid, false},

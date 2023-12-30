@@ -31,7 +31,7 @@ void handleOverlap(RigidManifold& m1, RigidManifold& m2, const CollisionInfo& ma
     auto& t1 = *m1.transform;
     auto& t2 = *m2.transform;
 
-    constexpr float response_coef = 0.75f;
+    constexpr float response_coef = 0.9f;
     constexpr float pos_rot_weight = 0.7f;
     const float offset = man.overlap * response_coef;
 

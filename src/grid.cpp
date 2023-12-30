@@ -61,7 +61,7 @@ static std::vector<vec2f> smoothPointsPuecker(Iter points_begin, Iter points_end
         return {*points_begin, *points_back};
     }
 }
-static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 2.85f) {
+static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 1.45f) {
     auto result = smoothPointsPuecker(points.begin(), points.end(), epsilon);
     if(result.size() < 3)
         return points;
@@ -239,7 +239,7 @@ void Grid::convertFloatingParticles(ParticleManager& manager) {
                     world[m_idx(x, y)] = Cell(eCellType::Air);
                     manager.add(vec2f(x + ParticleGroup::radius,
                                       y + ParticleGroup::radius),
-                                cell);
+                                cell, vec2f(0.f, -50000.f));
                 }
             }
         }

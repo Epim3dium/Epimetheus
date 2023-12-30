@@ -77,19 +77,35 @@ struct ParticleGroup {
             a = {0, -100};
     }
     void collideWithGrid(Grid& grid) {
+        auto isInBounds = [&](vec2f p) {
+            return (p.x > 0.f && p.y > 0.f && p.x < grid.width && p.y < grid.height);
+        };
         for (int i = 0; i < size(); i++) {
             auto p = position[i];
-            if (grid.get(p.x, p.y).type != eCellType::Air && !grid.get(p.x, p.y).isFloating) {
-                auto op = position_old[i];
-                if (!(op.x == 0 || op.y == 0 || op.x == grid.width - 1 ||
-                      op.y == grid.height - 1))
-                    grid.set({static_cast<int>(op.x), static_cast<int>(op.y)},
-                             cell_info[i]);
-                swap(i, size() - 1);
-                pop_back();
-                i--;
+            if (grid.get(p.x, p.y).type == eCellType::Air) {
                 continue;
             }
+
+            if(qlen(position_old[i] - position[i]) == 0.f) {
+                continue;
+            }
+            auto n = normal(position_old[i] - position[i]);
+
+            size_t iters = 0;
+            static constexpr size_t max_iter_count = 10U;
+            while(!isInBounds(p) || grid.get(p.x, p.y).type != eCellType::Air) {
+                p += n;
+                if(max_iter_count == ++iters)
+                    break;
+            }
+            if(isInBounds(p) && iters != max_iter_count) {
+                grid.set({static_cast<int>(p.x), static_cast<int>(p.y)},
+                         cell_info[i]);
+            }
+            swap(i, size() - 1);
+            pop_back();
+            i--;
+            continue;
         }
     }
     void processBoundryConstraint(vec2f min, vec2f max) {

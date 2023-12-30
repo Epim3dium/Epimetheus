@@ -143,7 +143,7 @@ class ConvexPolygon {
             points[i] += pos;
         }
     }
-    void m_avgPoints() {
+    static std::vector<vec2f> m_avgPoints(std::vector<vec2f> model) {
         vec2f avg = vec2f(0, 0);
         for(auto& p : model) {
             avg += p;
@@ -152,6 +152,7 @@ class ConvexPolygon {
         for(auto& p : model) {
             p -= avg;
         }
+        return model;
     }
 public:
     float getRot() const {
@@ -187,7 +188,7 @@ public:
             return atan2(a.y, a.x) < atan2(b.y, b.x);
         });
         m_updatePoints();
-        m_avgPoints();
+        //m_avgPoints(model);
     }
 
     static ConvexPolygon CreateRegular(vec2f pos, float rot, size_t count, float dist);

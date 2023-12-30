@@ -16,10 +16,24 @@
 using namespace epi;
 
 struct DynamicObject {
+    //rigidbody stuff
     Transform transform;
     Collider collider;
     Rigidbody rigidbody;
     Material material;
+
+    //texture stuff
+    sf::Texture tex;
+    vec2f tex_size;
+    vec2f tex_offset;
+
+    //collision with particles
+    std::vector<vec2f> model_points;
+    std::vector<vec2f> getVerticies() const {
+        std::vector<vec2f> verticies;
+    }
+
+
     RigidManifold getManifold() {
         RigidManifold man;
         man.transform =&transform;
@@ -28,11 +42,42 @@ struct DynamicObject {
         man.collider = &collider;
         return man;
     }
-    DynamicObject(ConcavePolygon poly) : collider(poly) {
-        transform.setPos(poly.getPos());
+    void m_carveShape(ConcavePolygon shape, Grid& grid) {
+        AABB bounding_box = AABB::CreateFromPolygon(shape.getPolygons().front());
+        for(auto& p : shape.getPolygons())
+            bounding_box = bounding_box.combine(AABB::CreateFromPolygon(p));
+        sf::Image rend_tex;
+
+        rend_tex.create(bounding_box.size().x, bounding_box.size().y, sf::Color::Transparent);
+        tex_size = bounding_box.size();
+        tex_offset = -shape.getPos() + bounding_box.center();
+
+        for(int y = bounding_box.bottom(); y < bounding_box.top(); y++) {
+            for(int x = bounding_box.left(); x < bounding_box.right(); x++) {
+                bool isInside = false;
+                for(auto convex : shape.getPolygons()) {
+                    if(isOverlappingPointPoly(vec2f(x, y) + vec2f(0.5f, 0.5f), convex.getVertecies())) {
+                        isInside = true;
+                    }
+                }
+                if(!isInside) {
+                    continue;
+                }
+                sf::Vertex vert;
+                auto cell = grid.get(x, y);
+                if(cell.type == eCellType::Air)
+                    continue;
+                auto coord = vec2f(x, y) - bounding_box.min;
+                rend_tex.setPixel(coord.x, coord.y, cell.color);
+                grid.set({x, y}, Cell(eCellType::Air));
+            }
+        }
+        tex.loadFromImage(rend_tex);
+
     }
-    static DynamicObject create(ConvexPolygon poly) {
-        return DynamicObject(ConcavePolygon({poly}));
+    DynamicObject(ConcavePolygon shape, Grid& grid) : collider(shape) {
+        m_carveShape(shape, grid);
+        transform.setPos(shape.getPos());
     }
     static void sortClockWise(std::vector<vec2f>& points) {
         int sign = 0;
@@ -47,12 +92,26 @@ struct DynamicObject {
             std::reverse(points.begin(), points.end());
         }
     }
-    static DynamicObject create(std::vector<vec2f> points) {
+    static DynamicObject create(std::vector<vec2f> points, Grid& grid) {
         sortClockWise(points);
         auto triangles = triangulate(points);
         auto polygons = partitionConvex(triangles);
         ConcavePolygon concave_poly(polygons);
-        return DynamicObject(concave_poly);
+        for(auto& p : points) {
+            p -= concave_poly.getPos();
+        }
+        auto result = DynamicObject(concave_poly, grid);
+        result.model_points = points;
+        return result;
+    }
+    void draw(sf::RenderTarget& render_target) {
+        sf::RenderStates states;
+        states.transform.translate(transform.getPos());
+        states.transform.rotate(transform.getRot() / EPI_PI * 180.f);
+        states.transform.translate(-tex_size / 2.f + tex_offset);
+        sf::Sprite spr;
+        spr.setTexture(tex);
+        render_target.draw(spr, states);
     }
 };
 
@@ -93,7 +152,7 @@ public:
         event_handler.addCallback(sf::Event::KeyPressed, 
             [&](const sf::Event& e) {
                 if(e.key.code == sf::Keyboard::Enter) {
-                    auto concave = DynamicObject::create(opt.rigid_construct_points);
+                    auto concave = DynamicObject::create(opt.rigid_construct_points, grid);
                     dynamic_objects.push_back(concave);
                     dynamic_objects.back().collider.parent_collider = &dynamic_objects.back().collider;
                     if(e.key.shift)
@@ -165,8 +224,8 @@ public:
                 }
             }
             if(canSpawn) {
-                for(float y = mouse_pos.y - spawn_size / 2; y < mouse_pos.y + spawn_size / 2; y += ParticleGroup::radius * 2.f) {
-                    for(float x = mouse_pos.x - spawn_size / 2; x < mouse_pos.x + spawn_size / 2; x += ParticleGroup::radius * 2.f) {
+                for(float y = mouse_pos.y - spawn_size; y < mouse_pos.y + spawn_size; y += ParticleGroup::radius * 2.f) {
+                    for(float x = mouse_pos.x - spawn_size; x < mouse_pos.x + spawn_size; x += ParticleGroup::radius * 2.f) {
                         if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
                             particle_manager.add({x, y}, Cell(eCellType::Water), force);
                         }
@@ -176,7 +235,7 @@ public:
         }
         last_mouse_pos = getMousePos();
         grid.update(Time::deltaTime());
-        // grid.convertFloatingParticles(particle_manager);
+        grid.convertFloatingParticles(particle_manager);
         particle_manager.update(Time::deltaTime(), grid);
         for(auto& object : dynamic_objects)
             object.rigidbody.addForce(vec2f{0, -100} * object.rigidbody.mass * static_cast<float>(Time::deltaTime()));
@@ -233,6 +292,7 @@ public:
                 }
                 downscaled.draw(vert, points.size(), sf::TrianglesFan);
             }
+            object.draw(downscaled);
         }
 
         sf::Sprite spr;
