@@ -67,7 +67,7 @@ private:
 public:
     //number of physics/collision steps per frame
     size_t steps = 8;
-    bool isSleepy = false;
+    bool isSleepy = true;
 
     /*
     * updates all rigidbodies bound applying their velocities and resoving collisions

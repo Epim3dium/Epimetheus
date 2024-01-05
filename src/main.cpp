@@ -15,105 +15,6 @@
 
 using namespace epi;
 
-struct DynamicObject {
-    //rigidbody stuff
-    Transform transform;
-    Collider collider;
-    Rigidbody rigidbody;
-    Material material;
-
-    //texture stuff
-    sf::Texture tex;
-    vec2f tex_size;
-    vec2f tex_offset;
-
-    //collision with particles
-    std::vector<vec2f> model_points;
-    std::vector<vec2f> getVerticies() const {
-        std::vector<vec2f> verticies;
-    }
-
-
-    RigidManifold getManifold() {
-        RigidManifold man;
-        man.transform =&transform;
-        man.rigidbody =&rigidbody;
-        man.material = &material;
-        man.collider = &collider;
-        return man;
-    }
-    void m_carveShape(ConcavePolygon shape, Grid& grid) {
-        AABB bounding_box = AABB::CreateFromPolygon(shape.getPolygons().front());
-        for(auto& p : shape.getPolygons())
-            bounding_box = bounding_box.combine(AABB::CreateFromPolygon(p));
-        sf::Image rend_tex;
-
-        rend_tex.create(bounding_box.size().x, bounding_box.size().y, sf::Color::Transparent);
-        tex_size = bounding_box.size();
-        tex_offset = -shape.getPos() + bounding_box.center();
-
-        for(int y = bounding_box.bottom(); y < bounding_box.top(); y++) {
-            for(int x = bounding_box.left(); x < bounding_box.right(); x++) {
-                bool isInside = false;
-                for(auto convex : shape.getPolygons()) {
-                    if(isOverlappingPointPoly(vec2f(x, y) + vec2f(0.5f, 0.5f), convex.getVertecies())) {
-                        isInside = true;
-                    }
-                }
-                if(!isInside) {
-                    continue;
-                }
-                sf::Vertex vert;
-                auto cell = grid.get(x, y);
-                if(cell.type == eCellType::Air)
-                    continue;
-                auto coord = vec2f(x, y) - bounding_box.min;
-                rend_tex.setPixel(coord.x, coord.y, cell.color);
-                grid.set({x, y}, Cell(eCellType::Air));
-            }
-        }
-        tex.loadFromImage(rend_tex);
-
-    }
-    DynamicObject(ConcavePolygon shape, Grid& grid) : collider(shape) {
-        m_carveShape(shape, grid);
-        transform.setPos(shape.getPos());
-    }
-    static void sortClockWise(std::vector<vec2f>& points) {
-        int sign = 0;
-        for(int i = 0; i < points.size(); i++) {
-            auto first = points[i];
-            auto mid = points[(i + 1) % points.size()];
-            auto last = points[(i + 2) % points.size()];
-            float angle = angleAround(first, mid, last);
-            sign += angle > 0.f ? 1 : -1;
-        }
-        if(sign < 0) {
-            std::reverse(points.begin(), points.end());
-        }
-    }
-    static DynamicObject create(std::vector<vec2f> points, Grid& grid) {
-        sortClockWise(points);
-        auto triangles = triangulate(points);
-        auto polygons = partitionConvex(triangles);
-        ConcavePolygon concave_poly(polygons);
-        for(auto& p : points) {
-            p -= concave_poly.getPos();
-        }
-        auto result = DynamicObject(concave_poly, grid);
-        result.model_points = points;
-        return result;
-    }
-    void draw(sf::RenderTarget& render_target) {
-        sf::RenderStates states;
-        states.transform.translate(transform.getPos());
-        states.transform.rotate(transform.getRot() / EPI_PI * 180.f);
-        states.transform.translate(-tex_size / 2.f + tex_offset);
-        sf::Sprite spr;
-        spr.setTexture(tex);
-        render_target.draw(spr, states);
-    }
-};
 
 #define GRID_DOWNSCALE 2
 class Demo : public App {
@@ -130,7 +31,7 @@ public:
     struct {
         std::vector<vec2f> rigid_construct_points;
         int brush_size = 20;
-        bool showColliderEdges = true;
+        bool showColliderEdges = false;
     }opt;
 
     sf::Clock clock_processing_time;
@@ -234,11 +135,51 @@ public:
             }
         }
         last_mouse_pos = getMousePos();
-        grid.update(Time::deltaTime());
-        grid.convertFloatingParticles(particle_manager);
-        particle_manager.update(Time::deltaTime(), grid);
+
+        
+        for(auto& object : dynamic_objects) {
+            auto outline = object.getVerticies();
+            auto aabb = object.getManifold().collider->getAABB(*object.getManifold().transform);
+            for(float y = std::max(aabb.min.y, 0.f); y <= aabb.max.y; y++) {
+                for(float x = std::max(aabb.min.x, 0.f); x <= aabb.max.x; x++) {
+                    bool isOverlapping = false;
+                    isOverlapping |= isOverlappingPointPoly(vec2f(x, y) + vec2f(0.5f, 0.5f), outline);
+                    if(!isOverlapping)
+                        continue;
+                    auto cell = grid.get(x, y);
+
+                    if(cell.type == eCellType::Bedrock || cell.type == eCellType::Barrier || cell.getPropery().isColideable)
+                        continue;
+                    grid.set(vec2i(x, y), Cell(eCellType::Barrier));
+                    object.personal_barriers.push_back(vec2i(x, y));
+
+                    int offy = 1;
+                    while(grid.get(x, y + offy).type != eCellType::Air) {
+                        offy++;
+                    }
+                    grid.set(vec2i(x, y + offy), cell);
+                }
+            }
+        }
+        grid.update(Time::deltaTime(), particle_manager);
+
+        for(auto& object : dynamic_objects) {
+            for(auto coord : object.personal_barriers) {
+                if(grid.get(coord).type == eCellType::Barrier){
+                    grid.set(coord, Cell(eCellType::Air)); 
+                }
+            }
+            object.personal_barriers.clear();
+        }
+        grid.m_convertFloatingParticles(particle_manager);
+
+        physics_manager.update(Time::deltaTime());
+        particle_manager.update(Time::deltaTime(), grid, dynamic_objects);
+
+        //gravity
         for(auto& object : dynamic_objects)
             object.rigidbody.addForce(vec2f{0, -100} * object.rigidbody.mass * static_cast<float>(Time::deltaTime()));
+        //remove outside sim window
         for(auto itr = dynamic_objects.begin(); itr != dynamic_objects.end(); itr++) {
             auto& object = *itr;
             if(!isOverlappingAABBAABB(object.collider.getAABB(object.transform), AABB::CreateMinMax(vec2f{0, 0}, vec2f(grid.width, grid.height)))) {
@@ -246,13 +187,13 @@ public:
                 itr = dynamic_objects.erase(itr);
             }
         }
-        physics_manager.update(Time::deltaTime());
+
         processing_time = clock_processing_time.getElapsedTime().asSeconds();
     }
     void onRender(sf::RenderWindow& window) override {
+
         grid.render(downscaled);
         particle_manager.render(downscaled);
-
         for(auto p : opt.rigid_construct_points) {
             sf::Vertex vert;
             vert.position = p;
@@ -295,17 +236,19 @@ public:
             object.draw(downscaled);
         }
 
-        sf::Sprite spr;
-        spr.setPosition(0, 0);
-        spr.setTexture(downscaled.getTexture());
-        float scalar = pixelSize(window.getSize());
-        spr.setScale(scalar, scalar);
-        window.draw(spr);
 
         auto getScreenPos = [&](vec2f grid_pos) {
             auto px_size = pixelSize(window.getSize());
             return vec2f(grid_pos.x * px_size, window.getSize().y - grid_pos.y * px_size);
         };
+        sf::Sprite spr;
+        spr.setPosition(0, 0);
+        spr.setTexture(downscaled.getTexture());
+        sf::IntRect rect = {2, 2, static_cast<int>(downscaled.getSize().x) - 4, static_cast<int>(downscaled.getSize().y) - 4};
+        spr.setTextureRect(rect);
+        float scalar = pixelSize(window.getSize());
+        spr.setScale(scalar, scalar);
+        window.draw(spr);
         if(opt.showColliderEdges) {
         for(auto& object : dynamic_objects) {
              for(auto poly : object.collider.getPolygonShape(object.transform)) {

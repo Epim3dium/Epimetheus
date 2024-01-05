@@ -3,12 +3,14 @@
 #include "SFML/System/Vector2.hpp"
 #include <unordered_map>
 namespace epi {
-enum class eCellType {
+enum class eCellType : size_t {
     Bedrock,
     Stone,
     Air,
     Sand,
     Water,
+    Barrier,
+    TYPE_COUNT,
 };
 enum class eState {
     Liquid,
@@ -32,8 +34,10 @@ struct Cell {
     size_t last_time_updated = 0;
     bool isFloating = false;
 
-    static const updateFunc_t g_updates[];
-    static const CellPropery properties[];
+    static updateFunc_t g_updates[];
+    static CellPropery properties[];
+    static bool hasInitializedProperties;
+    static bool initializeProperties();
 
     const CellPropery& getPropery() const {
         return properties[static_cast<size_t>(type)];

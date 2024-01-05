@@ -130,7 +130,7 @@ void PhysicsManager::updateRestraints(float delT) {
     for(auto& r : _restraints)
         r->update(delT);
 }
-#define DORMANT_MIN_VELOCITY 150.f
+#define DORMANT_MIN_VELOCITY 15.f
 #define DORMANT_MIN_ANGULAR_VELOCITY 0.1f
 void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
     if(man.collider->isTrigger)

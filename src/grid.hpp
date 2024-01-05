@@ -55,6 +55,7 @@ class Grid {
     std::vector<std::vector<vec2f>> m_extractPolygonPoints(AABB seg);
     ConcavePolygon m_extractPolygon(AABB seg);
 public:
+    void m_convertFloatingParticles(ParticleManager& manager);
     struct {
         std::list<SegmentDynamicObject> segment_colliders;
         Rigidbody rigidbody;
@@ -81,7 +82,7 @@ public:
     }
 
     Grid(size_t w, size_t h, PhysicsManager& phy_manager)
-        : width(w), height(h), world(w * h, Cell(eCellType::Air)) 
+        : width(w), height(h), world(w * h, Cell(eCellType::Air))
     {
         current_segments = std::vector<SegmentT>(segmentsWidth() * segmentsHeight());
 
@@ -127,7 +128,7 @@ public:
         assert(w == h);
         img.create(w, h, Cell(eCellType::Air).color);
     }
-    void update(float delT) {
+    void update(float delT, ParticleManager& part_man) {
         std::swap(current_segments, last_segments);
         for(auto& t : current_segments) {
             t.min = {0xffffff, 0xffffff};
@@ -144,7 +145,6 @@ public:
         }
         last_tick_updated++;
     }
-    void convertFloatingParticles(ParticleManager& manager);
 
     const Cell& get(int x, int y) const {
         return world[m_idx(x, y)]; 

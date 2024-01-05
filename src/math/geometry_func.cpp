@@ -122,12 +122,12 @@ vec2f findClosestPointOnRay(vec2f ray_origin, vec2f ray_dir, vec2f point) {
         return ray_origin + ray_dir;
     return ray_dir_normal * proj + ray_origin;
 }
-vec2f findClosestPointOnEdge(vec2f point, const ConvexPolygon& poly) {
+vec2f findClosestPointOnEdge(vec2f point, const std::vector<vec2f>& points) {
     vec2f closest(INFINITY, INFINITY);
     float closest_dist = INFINITY;
-    for(size_t i = 0; i < poly.getVertecies().size(); i++) {
-        vec2f a = poly.getVertecies()[i];
-        vec2f b = poly.getVertecies()[(i + 1) % poly.getVertecies().size()];
+    for(size_t i = 0; i < points.size(); i++) {
+        vec2f a = points[i];
+        vec2f b = points[(i + 1) % points.size()];
         vec2f adir = b - a;
         vec2f t = findClosestPointOnRay(a, adir, point);
         float dist = length(t - point);

@@ -1,9 +1,11 @@
 #ifndef EPI_PARTICLES_HPP
 #define EPI_PARTICLES_HPP
 
+
 #include "SFML/Graphics/RenderTarget.hpp"
 #include "SFML/Graphics/VertexArray.hpp"
 #include "cell.hpp"
+#include "dynamic_object.hpp"
 #include "grid.hpp"
 #include "math/geometry_func.hpp"
 #include "math/math.hpp"
@@ -92,9 +94,10 @@ struct ParticleGroup {
             auto n = normal(position_old[i] - position[i]);
 
             size_t iters = 0;
-            static constexpr size_t max_iter_count = 10U;
+            static constexpr size_t max_iter_count = 32U;
             while(!isInBounds(p) || grid.get(p.x, p.y).type != eCellType::Air) {
                 p += n;
+                //p += vec2f(0, 1.f);
                 if(max_iter_count == ++iters)
                     break;
             }
@@ -274,6 +277,24 @@ class ParticleManager {
     void m_processGridCollisions(Grid& grid) {
         m_particles.collideWithGrid(grid);
     }
+    void m_processObjectCollisions(std::list<DynamicObject>& dynamic_objects) {
+        static float constexpr response_coef = 0.1f;
+        for(auto& object : dynamic_objects) {
+            auto outline = object.getVerticies();
+            auto aabb = object.getManifold().collider->getAABB(*object.getManifold().transform);
+            for(float y = aabb.min.y; y <= aabb.max.y; y++) {
+                for(float x = aabb.min.x; x <= aabb.max.x; x++) {
+                    auto particle_positions = queue({x, y});
+                    for(auto& part : particle_positions) {
+                        if(isOverlappingPointPoly(*part, outline)) {
+                            auto diff = findClosestPointOnEdge(*part, outline) - *part;
+                            *part += diff * response_coef; 
+                        }
+                    }
+                }
+            }
+        }
+    }
     struct ParticleInitValues {
         vec2f pos;
         Cell cell;
@@ -305,21 +326,22 @@ public:
             return *part_col_grid.boxOf(pos);
         return {};
     }
-    void update(float delT, Grid& grid) {
+    void update(float delT, Grid& grid, std::list<DynamicObject>& dyn_objects) {
         const size_t steps = 8U;
         float sdelT = delT / static_cast<float>(steps);
 
         for (int iter = 0; iter < steps; iter++) {
 
-            part_col_grid.clear();
-
             m_addQueuedParticles();
 
             m_processGridCollisions(grid);
 
+            part_col_grid.clear();
             m_insertIntoBoxes();
 
             m_processCollisions();
+
+            m_processObjectCollisions(dyn_objects);
 
             m_particles.updatePositions(sdelT);
             
@@ -334,6 +356,9 @@ public:
             sf::Vertex v;
             v.position = m_particles.position[i];
             v.color = m_particles.cell_info[i].color;
+            v.color.r *= 1.3f;
+            v.color.g *= 1.3f;
+            v.color.b *= 1.3f;
             arr.append(v);
         }
         target.draw(arr);

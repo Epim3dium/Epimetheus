@@ -61,7 +61,7 @@ static std::vector<vec2f> smoothPointsPuecker(Iter points_begin, Iter points_end
         return {*points_begin, *points_back};
     }
 }
-static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 1.45f) {
+static std::vector<vec2f> smoothPoints(const std::vector<vec2f>& points, float epsilon = 0.85f) {
     auto result = smoothPointsPuecker(points.begin(), points.end(), epsilon);
     if(result.size() < 3)
         return points;
@@ -109,8 +109,8 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
     struct BorderCheckLine {
         vec2i local_border;
         vec2i check_dir;
-        vec2i from;
-        vec2i to;
+        vec2i line_from;
+        vec2i line_to;
     };
     static const std::vector<BorderCheckLine> hor_checks = {
         {vec2i{-1, 0},                vec2i{0, -1}, vec2i{1, 0}, vec2i{0, 0}},
@@ -120,6 +120,8 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
         {vec2i{0, -1},                vec2i{-1, 0}, vec2i{0, 0}, vec2i{0, 1}},
         {vec2i{SEGMENT_SIZE - 1, -1}, vec2i{1, 0},  vec2i{1, 1}, vec2i{1, 0}},
     };
+    static const vec2i invalid_pos = vec2i(-1, -1);
+
     std::vector<std::vector<std::pair<vec2f, vec2f>>> result;
 
     int base_x = seg.center().x / SEGMENT_SIZE;
@@ -129,7 +131,6 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
     int xend = xstart + SEGMENT_SIZE;
     int yend = ystart + SEGMENT_SIZE;
 
-    const vec2i invalid_pos = vec2i(-1, -1);
     std::vector<std::vector<vec2i>> path(SEGMENT_SIZE + 1, std::vector<vec2i>(SEGMENT_SIZE + 1, invalid_pos));
 
     auto checkAndAddLines = [&](int xoff, int yoff, const std::vector<BorderCheckLine>& checks) {
@@ -138,7 +139,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
         if(isCellColliderEligable(cell)) {
             for(auto check : checks) {
                 if(yoff == check.local_border.y || xoff == check.local_border.x) {
-                    path[yoff + check.from.y][xoff + check.from.x] = check.to + vec2i(xoff, yoff);
+                    path[yoff + check.line_from.y][xoff + check.line_from.x] = check.line_to + vec2i(xoff, yoff);
                 }
             }
         }else {
@@ -147,7 +148,7 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
                 if(yoff != check.local_border.y && xoff != check.local_border.x 
                         && isCellColliderEligable(cell)) 
                 {
-                    path[yoff + check.to.y][xoff + check.to.x] = check.from + vec2i(xoff, yoff);
+                    path[yoff + check.line_to.y][xoff + check.line_to.x] = check.line_from + vec2i(xoff, yoff);
                 }
             }
         }
@@ -174,14 +175,17 @@ std::vector<std::vector<std::pair<vec2f, vec2f>>> Grid::m_extractRayGroups(AABB 
     }
     vec2i starting_pos;
     while((starting_pos = findFirstInPath()) !=  invalid_pos) {
+        //new island
         result.push_back({});
         vec2i last = invalid_pos;
         vec2i coord = starting_pos;
-        bool invert = false;
         while(coord != last) {
             last = coord;
             coord = path[coord.y][coord.x];
+
+            //mark as visited
             path[last.y][last.x] = invalid_pos;
+
             if(coord == invalid_pos)
                 break;
             vec2f a = vec2f(coord) + vec2f(xstart, ystart);
@@ -212,7 +216,6 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
             if (get(x, y).last_time_updated >= last_tick_updated)
                 continue;
             world[m_idx(x, y)].last_time_updated = last_tick_updated;
-            world[m_idx(x, y)].isFloating = false;
             auto func =
                 Cell::g_updates[static_cast<size_t>(world[m_idx(x, y)].type)];
             func(*this, {x, y});
@@ -226,10 +229,11 @@ void Grid::m_updateSegment(SegmentT seg, size_t index) {
         for(int i = 0; i < index; i++) itr++;
         auto shape = m_extractPolygon(seg);
         itr->collider.setShape(shape);
+        itr->collider.time_immobile = 0.f;
         itr->transform.setPos(shape.getPos());
     }
 }
-void Grid::convertFloatingParticles(ParticleManager& manager) {
+void Grid::m_convertFloatingParticles(ParticleManager& manager) {
     for (auto seg : current_segments) {
         for (int y = seg.bottom(); y <= seg.top(); y++) {
             for (int x = seg.left(); x <= seg.right(); x++) {

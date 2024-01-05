@@ -12,7 +12,7 @@ bool AABBcontainsAABB(const AABB& r1, const AABB& r2);
 //finds the closest vector to point that lies on ray
 vec2f findClosestPointOnRay(vec2f ray_origin, vec2f ray_dir, vec2f point);
 //finds the closest vetor to point that lies on one of poly's edges
-vec2f findClosestPointOnEdge(vec2f point, const ConvexPolygon& poly);
+vec2f findClosestPointOnEdge(vec2f point, const std::vector<vec2f>& poly);
 std::vector<vec2f> findContactPointFast(const ConvexPolygon* p0, const ConvexPolygon* p1, vec2f cn);
 //returns all of contact points of 2 polygons
 std::vector<vec2f> findContactPoints(const ConvexPolygon& r1, const ConvexPolygon& r2);

@@ -14,7 +14,9 @@ void updateSand(Grid& g, sf::Vector2i vec) {
         auto tmp = g.get(vec);
         tmp.isFloating = true;
         g.set(vec, tmp);
-        g.swap_at(vec, other_coord);
+        if(g.get(other_coord).getPropery().state != eState::Gas) {
+            g.swap_at(vec, other_coord);
+        }
         return;
     }
     for(auto dir : {vec2i{first_dir, -1}, {-first_dir, -1}}) {
@@ -34,7 +36,7 @@ void updateWater(Grid& g, sf::Vector2i vec) {
         auto tmp = g.get(vec);
         tmp.isFloating = true;
         g.set(vec, tmp);
-        g.swap_at(vec, other_coord);
+        //g.swap_at(vec, other_coord);
         return;
     }
     for(auto dir : std::vector<sf::Vector2i>{{0, -1}, {first_dir, -1}, {-first_dir, -1}, {first_dir, 0}, {-first_dir, 0}}) {
@@ -45,19 +47,25 @@ void updateWater(Grid& g, sf::Vector2i vec) {
     }
     return;
 }
-const CellPropery Cell::properties[] = {
-    {sf::Color(232, 19,  240), eState::Solid,  true},
-    {sf::Color(127, 127, 127), eState::Solid,  true},
-    {sf::Color(21,  23,  87),  eState::Gas,    false},
-    {sf::Color(194, 175, 83),  eState::Powder, true},
-    {sf::Color(52,  108, 130), eState::Liquid, false},
-};
-const updateFunc_t Cell::g_updates[] = { 
-    updateNone,
-    updateNone,
-    updateNone,
-    updateSand,
-    updateWater,
-};
+updateFunc_t Cell::g_updates[static_cast<size_t>(eCellType::TYPE_COUNT)];
+CellPropery Cell::properties[static_cast<size_t>(eCellType::TYPE_COUNT)];
+bool Cell::initializeProperties() {
+    Cell::g_updates[static_cast<size_t>(eCellType::Bedrock)] = updateNone;
+    Cell::g_updates[static_cast<size_t>(eCellType::Stone)]   = updateNone;
+    Cell::g_updates[static_cast<size_t>(eCellType::Air)]     = updateNone;
+    Cell::g_updates[static_cast<size_t>(eCellType::Sand)]    = updateSand;
+    Cell::g_updates[static_cast<size_t>(eCellType::Water)]   = updateWater;
+    Cell::g_updates[static_cast<size_t>(eCellType::Barrier)] = updateNone;
+
+    Cell::properties[static_cast<size_t>(eCellType::Bedrock)] =  {sf::Color(232, 19,  240), eState::Solid,  true};
+    Cell::properties[static_cast<size_t>(eCellType::Stone)]   =  {sf::Color(127, 127, 127), eState::Solid,  true};
+    Cell::properties[static_cast<size_t>(eCellType::Air)]     =  {sf::Color(21,  23,  87),  eState::Gas,    false};
+    Cell::properties[static_cast<size_t>(eCellType::Sand)]    =  {sf::Color(194, 175, 83),  eState::Powder, true};
+    Cell::properties[static_cast<size_t>(eCellType::Water)]   =  {sf::Color(52,  108, 130), eState::Liquid, false};
+    Cell::properties[static_cast<size_t>(eCellType::Barrier)] =  {sf::Color(155, 155, 0),   eState::Solid,  false};
+
+    return true;
+}
+bool Cell::hasInitializedProperties = initializeProperties();
 
 }
