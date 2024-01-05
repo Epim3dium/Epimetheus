@@ -3,6 +3,7 @@ set(SOURCE_FILES
     types.cpp
     cell.cpp
     grid.cpp
+    particles.cpp
 
     io/app.cpp
 
@@ -24,6 +25,7 @@ set(HEADER_FILES
     types.hpp
     cell.hpp
     grid.hpp
+    particles.hpp
 
     multithreading/thread_pool.hpp
 

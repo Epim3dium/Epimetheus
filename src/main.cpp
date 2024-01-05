@@ -120,13 +120,13 @@ public:
             ticks++;
             bool canSpawn = true;
             for(auto dir : {vec2f{0, 0}, {0, -1}, {0, 1}, {1, 0}, {-1, 0}, {1, 1}, {-1, -1}}) {
-                if(particle_manager.queue(mouse_pos + dir * ParticleGroup::radius).size() != 0) {
+                if(particle_manager.queue(mouse_pos + dir * Particles::radius).size() != 0) {
                     canSpawn = false;
                 }
             }
             if(canSpawn) {
-                for(float y = mouse_pos.y - spawn_size; y < mouse_pos.y + spawn_size; y += ParticleGroup::radius * 2.f) {
-                    for(float x = mouse_pos.x - spawn_size; x < mouse_pos.x + spawn_size; x += ParticleGroup::radius * 2.f) {
+                for(float y = mouse_pos.y - spawn_size; y < mouse_pos.y + spawn_size; y += Particles::radius * 2.f) {
+                    for(float x = mouse_pos.x - spawn_size; x < mouse_pos.x + spawn_size; x += Particles::radius * 2.f) {
                         if(sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
                             particle_manager.add({x, y}, Cell(eCellType::Water), force);
                         }

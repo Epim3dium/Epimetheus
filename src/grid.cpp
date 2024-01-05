@@ -241,8 +241,8 @@ void Grid::m_convertFloatingParticles(ParticleManager& manager) {
                     auto cell = world[m_idx(x, y)];
                     cell.isFloating = false;
                     world[m_idx(x, y)] = Cell(eCellType::Air);
-                    manager.add(vec2f(x + ParticleGroup::radius,
-                                      y + ParticleGroup::radius),
+                    manager.add(vec2f(x + Particles::radius,
+                                      y + Particles::radius),
                                 cell, vec2f(0.f, -50000.f));
                 }
             }
