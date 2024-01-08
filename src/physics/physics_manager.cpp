@@ -51,13 +51,13 @@ void Merge(Collider* a, Collider* b) {
 bool Friends(Collider* a, Collider* b) {
     return getHead(a) == getHead(b);
 }
-static bool isDormant(RigidManifold man) {
+static bool isNotMoving(RigidManifold man) {
     return man.collider->isSleeping || man.rigidbody->isStatic;
 }
 
 static bool areCompatible(RigidManifold r1, RigidManifold r2) {
     return (!r1.collider->isTrigger || !r2.collider->isTrigger) &&
-        !(isDormant(r1) && isDormant(r2)) && 
+        !(isNotMoving(r1) && isNotMoving(r2)) && 
         (r2.collider->mask.size() == 0 || r1.collider->tag == r2.collider->mask) && 
         (r1.collider->mask.size() == 0 || r2.collider->tag == r1.collider->mask);
 }
@@ -143,7 +143,7 @@ void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
         man.collider->time_immobile = 0.f;
     }
 
-    if(isDormant(man)){
+    if(isNotMoving(man)){
         rb.velocity = vec2f();
         rb.angular_velocity = 0.f;
         return;

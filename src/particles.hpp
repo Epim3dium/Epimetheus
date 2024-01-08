@@ -55,7 +55,40 @@ struct ParticleCollisionGrid {
     BoxT* boxOf(vec2f pos);
     void add(vec2f& p);
     void clear();
-    std::array<BoxT*, 8U> getAdjacentBoxes(BoxT& box);
+
+    template<size_t Count = 8U>
+    std::array<BoxT*, Count> getAdjacentBoxes(BoxT& box) {
+        std::array<BoxT*, Count> result;
+
+        size_t index = &box - &boxes.front();
+        int y = index / width;
+        int x = index - (y * width);
+        size_t cur_idx = 0;
+        for (int dy : {1, 0, -1}) {
+            for (int dx : {1, 0, -1}) {
+                if (dy == 0 && dx == 0)
+                    continue;
+                if (x + dx < 0 || x + dx >= width || y + dy < 0 ||
+                    y + dy >= height) {
+                    result[cur_idx] = nullptr;
+                } else {
+                    result[cur_idx] = &boxes[(y + dy) * width + x + dx];
+                }
+                cur_idx++;
+                if(cur_idx == Count)
+                    break;
+            }
+            if(cur_idx == Count)
+                break;
+        }
+        return result;
+    }
+    inline std::array<BoxT*, 4U> getHalfAdjacentBoxes(BoxT& box) {
+        return getAdjacentBoxes<4U>(box);
+    }
+    inline std::array<BoxT*, 8U> getAllAdjacentBoxes(BoxT& box) {
+        return getAdjacentBoxes<8U>(box);
+    }
 };
 class ParticleManager {
     float width;

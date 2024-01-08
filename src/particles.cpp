@@ -122,30 +122,6 @@ namespace epi {
         }
         used_boxes.clear();
     }
-    std::array<BoxT*, 8U> ParticleCollisionGrid::getAdjacentBoxes(BoxT& box) {
-        std::array<BoxT*, 8U> result;
-
-        size_t index = &box - &boxes.front();
-        int y = index / width;
-        int x = index - (y * width);
-        size_t cur_idx = 0;
-        for (int dy : {1, 0, -1}) {
-            for (int dx : {1, 0, -1}) {
-                if (dy == 0 && dx == 0)
-                    continue;
-                if (x + dx < 0 || x + dx >= width || y + dy < 0 ||
-                    y + dy >= height) {
-                    result[cur_idx] = nullptr;
-                } else {
-                    result[cur_idx] = &boxes[(y + dy) * width + x + dx];
-                }
-                cur_idx++;
-            }
-        }
-        assert(cur_idx == 8);
-
-        return result;
-    }
     bool ParticleManager::m_handleCollision(vec2f& p1, float m1, vec2f& p2, float m2) {
         float l = epi::dot(p1 - p2, p1 - p2);
         constexpr float min_r = Particles::radius * 2.f;
@@ -164,7 +140,7 @@ namespace epi {
         return true;
     }
     void ParticleManager::m_processCollisionForBox(ParticleCollisionGrid::BoxT& box) {
-        auto adj = part_col_grid.getAdjacentBoxes(box);
+        auto adj_boxes = part_col_grid.getHalfAdjacentBoxes(box);
         for (auto p1 : box) {
             for (auto p2 : box) {
                 if (p1 == p2)
@@ -172,11 +148,11 @@ namespace epi {
                 m_handleCollision(*p1, 1.f, *p2, 1.f);
             }
         }
-        for (auto idx : {0, 1, 2, 3}) {
-            if (!adj[idx])
+        for (auto& adj_box : adj_boxes) {
+            if (!adj_box)
                 continue;
             for (auto p1 : box) {
-                for (auto p2 : *adj[idx]) {
+                for (auto p2 : *adj_box) {
                     if (p1 == p2)
                         continue;
                     m_handleCollision(*p1, 1.f, *p2, 1.f);
