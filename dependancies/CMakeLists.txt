@@ -8,30 +8,39 @@ set(IMGUI_VERSION 1.87)
 # a repo and checking out a tag
 FetchContent_Declare(
   SFML
-  URL "https://github.com/SFML/SFML/archive/${SFML_VERSION}.zip"
+  GIT_REPOSITORY "https://github.com/SFML/SFML.git"
+  GIT_TAG        2.6.0
 )
 
 FetchContent_Declare(
   imgui
-  URL "https://github.com/ocornut/imgui/archive/v${IMGUI_VERSION}.zip"
+  GIT_REPOSITORY "https://github.com/ocornut/imgui.git"
+  GIT_TAG  v1.87
 )
 
 # Or by tag...
 FetchContent_Declare(
   imgui-sfml
-  GIT_REPOSITORY https://github.com/SFML/imgui-sfml.git
-  GIT_TAG        2.6.x
+  GIT_REPOSITORY "https://github.com/SFML/imgui-sfml.git"
+  GIT_TAG        v2.6
   # GIT_COMMIT 5f54b69b6aee18db846c81633f86f78c2586dded
   # ^ or like this - sometimes it's better because FetchContent won't look
   # into remote to see if branch head was updated or not - good for stable
   # tags like 'vX.X' corresponding to releases
 )
+FetchContent_Declare(
+  googletest
+  URL "https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip"
+)
+
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
 
 ## finally, let's build
 
 # SFML
-option(SFML_BUILD_AUDIO "Build audio" OFF)
-option(SFML_BUILD_NETWORK "Build network" OFF)
 FetchContent_MakeAvailable(sfml)
 
 # Dear ImGui
