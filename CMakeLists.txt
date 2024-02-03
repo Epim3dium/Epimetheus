@@ -15,5 +15,7 @@ set(CMAKE_C_FLAGS_DEBUG "-O0")
 
 add_subdirectory(dependancies)
 add_subdirectory(src)
+add_subdirectory(test)
+add_subdirectory(demo)
 
 include(cmake/Install.cmake)

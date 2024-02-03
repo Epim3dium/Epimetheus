@@ -4,7 +4,7 @@
 #include <functional>
 struct Entity {
 private:
-    const uint32_t id;
+    uint32_t id;
     static uint32_t getNextId() {
         static uint32_t s_id = 0;
         return s_id++;
@@ -20,6 +20,10 @@ public:
         return id != other();
     }
     Entity() : id(getNextId()) {}
+    Entity(const Entity& other) = default;
+    Entity(Entity&& other) = default;
+    Entity& operator=(const Entity& other) = default;
+    Entity& operator=(Entity&& other) = default;
 };
 template<>
 struct std::hash<Entity>

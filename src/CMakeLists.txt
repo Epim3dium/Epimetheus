@@ -1,9 +1,14 @@
 set(SOURCE_FILES
-    main.cpp
+    #main.cpp
     memory/pool_allocator.cpp
     debug/log.cpp
 )
 set(HEADER_FILES
+    core/entity.hpp
+    core/group.hpp
+    core/slice.hpp
+    core/primitive_wrapper.hpp
+    memory/parallel_iterator.hpp
     memory/pool_allocator.hpp
     memory/allocator.hpp
     debug/log.hpp
@@ -11,7 +16,7 @@ set(HEADER_FILES
     utils/set.hpp
     utils/stack_linked_list.hpp
 )
-add_executable(epimetheus
+add_library(epimetheus
     ${SOURCE_FILES} ${HEADER_FILES}
 )
 include_directories(.)
