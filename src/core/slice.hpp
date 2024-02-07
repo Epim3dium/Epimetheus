@@ -40,6 +40,15 @@ public:
         }
         return {};
     }
+    size_t size() const {
+        return m_entityToIndex.size();
+    }
+    typename iterator::reference operator[](size_t index) {
+        return *(std::next(this->begin(), index));
+    }
+    // typename iterator::const_reference operator[](size_t index) const {
+    //     return *(begin() + index);
+    // }
     template<class CompTy>
     std::optional<CompTy*> getComponent(Entity entity) {
         static_assert(is_present<CompTy, Types...>::value);

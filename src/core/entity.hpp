@@ -13,6 +13,12 @@ public:
     inline const uint32_t operator()() const {
         return id;
     }
+    inline bool operator<(const Entity& other) const {
+        return id < other();
+    }
+    inline bool operator>(const Entity& other) const {
+        return id > other();
+    }
     inline bool operator==(const Entity& other) const {
         return id == other();
     }
