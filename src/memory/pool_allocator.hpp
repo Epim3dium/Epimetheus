@@ -1,6 +1,6 @@
 //from: https://github.com/mtrebi/memory-allocators/blob/master/src/PoolAllocator.cpp
 #include "allocator.hpp"
-#include "../utils/stack_linked_list.hpp"
+#include "templates/stack_linked_list.hpp"
 
 #ifndef EPI_POOL_ALLOCATOR_H
 #define EPI_POOL_ALLOCATOR_H
