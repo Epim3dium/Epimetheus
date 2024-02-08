@@ -2,7 +2,7 @@
 #define EPI_GEOMETRY_FUNC_HPP
 #include "math_defs.hpp"
 #include <vector>
-#include "types.hpp"
+#include "math/types.hpp"
 
 namespace epi {
 

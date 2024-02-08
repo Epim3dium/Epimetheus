@@ -1,8 +1,8 @@
 #pragma once
-#include "col_utils.hpp"
 #include "imgui.h"
+#include "templates/set.hpp"
 #include "transform.hpp"
-#include "types.hpp"
+#include "math/types.hpp"
 #include "math/geometry_func.hpp"
 
 #include <cmath>
@@ -36,7 +36,7 @@ struct ColliderEvent {
     Collider& other;
     CollisionInfo info;
 };
-class Collider : public Signal::Subject<ColliderEvent> {
+class Collider /* : public Signal::Subject<ColliderEvent> */ {
     float m_inertia_dev_mass = -1.f;
     ConcavePolygon shape;
     vec2f cached_pos = {NAN, NAN};
@@ -47,8 +47,8 @@ public:
         shape = new_shape;
         //remove
     }
-    Tag tag;
-    Tag mask;
+    epi::Set<std::string> tag;
+    epi::Set<std::string> mask;
     bool isTrigger = false;
 
     Collider* parent_collider = this;

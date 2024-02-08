@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 #include "core/group.hpp"
-#include "core/primitive_wrapper.hpp"
+#include "templates/primitive_wrapper.hpp"
 #include "imgui-SFML.h"
 #include "imgui.h"
 #include "imgui_internal.h"

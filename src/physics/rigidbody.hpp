@@ -1,11 +1,10 @@
 #pragma once
-#include "col_utils.hpp"
 #include "imgui.h"
 #include "transform.hpp"
 #include "collider.hpp"
 #include "material.hpp"
 
-#include "types.hpp"
+#include "math/types.hpp"
 
 #include <cmath>
 #include <cstddef>

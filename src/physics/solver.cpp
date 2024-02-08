@@ -1,5 +1,4 @@
 #include "solver.hpp"
-#include "col_utils.hpp"
 #include "collider.hpp"
 #include "rigidbody.hpp"
 

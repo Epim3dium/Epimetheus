@@ -3,7 +3,6 @@
 #include "SFML/Graphics/RenderTarget.hpp"
 #include "SFML/System/Vector3.hpp"
 #include "math/geometry_func.hpp"
-#include "physics/col_utils.hpp"
 
 #include <cmath>
 #include <math.h>

@@ -1,5 +1,5 @@
 #pragma once
-#include "types.hpp"
+#include "math/types.hpp"
 namespace epi {
 // basic class to store physical material properties
 struct Material {

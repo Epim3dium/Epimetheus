@@ -1,5 +1,4 @@
 #include "restraint.hpp"
-#include "col_utils.hpp"
 #include <cmath>
 namespace epi {
 //inverse kinematics?

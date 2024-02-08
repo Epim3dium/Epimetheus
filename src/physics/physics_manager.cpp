@@ -1,5 +1,4 @@
 #include "physics_manager.hpp"
-#include "col_utils.hpp"
 #include "collider.hpp"
 #include "imgui.h"
 
@@ -109,9 +108,9 @@ void PhysicsManager::processNarrowPhase(const std::vector<PhysicsManager::ColInf
                 continue;
             }
 
-            ci->first.collider->notify({*ci->first.collider, *ci->second.collider, col_info});
+            //ci->first.collider->notify({*ci->first.collider, *ci->second.collider, col_info});
             col_info.cn *= -1.f;
-            ci->second.collider->notify({*ci->second.collider, *ci->first.collider, col_info});
+            //ci->second.collider->notify({*ci->second.collider, *ci->first.collider, col_info});
             col_info.cn *= -1.f;
 
             if(ci->first.collider->isTrigger || ci->second.collider->isTrigger) {

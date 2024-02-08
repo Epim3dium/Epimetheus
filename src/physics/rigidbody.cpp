@@ -1,6 +1,6 @@
 #include "rigidbody.hpp"
 #include "solver.hpp"
-#include "types.hpp"
+#include "math/types.hpp"
 
 namespace epi {
 //only dynamic objects should be placed as the r1 argument
