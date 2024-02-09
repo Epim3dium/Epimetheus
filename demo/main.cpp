@@ -3,6 +3,7 @@
 #include <thread>
 #include <unordered_set>
 
+#include "core/hierarchy.hpp"
 #include "core/group.hpp"
 #include "physics/collider.hpp"
 #include "templates/primitive_wrapper.hpp"
@@ -25,54 +26,10 @@ struct Scale : public sf::Vector2f {};
 struct LocalTransform : public sf::Transform {};
 struct GlobalTransform : public sf::Transform {};
 
-struct Parent : public Entity {};
-struct Children : public std::vector<Entity> {};
+using Hierarchy::Parent;
 
 typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
     TransformGroup;
-typedef Group<Parent, Children> HierarchyGroup;
-
-struct LayerInfo {
-    std::vector<size_t> path;
-    int max_layer = -1;
-};
-LayerInfo getLayerValues(Slice<Entity, Parent> slice) {
-    LayerInfo result;
-    std::map<Entity, int> layer_values;
-    std::vector<size_t> last_layer_member_index;
-    std::vector<size_t> first_layer_member_index;
-    result.path = std::vector<size_t>(slice.size(), -1);
-    size_t idx = 0;
-    for (auto [id, parent] : slice) {
-        int my_layer;
-        if (id == parent) {
-            my_layer = 0;
-        } else {
-            my_layer = layer_values.at(parent) + 1;
-        }
-        layer_values.insert_or_assign(id, my_layer);
-        if (my_layer > result.max_layer) {
-            result.max_layer = my_layer;
-            last_layer_member_index.push_back(idx);
-            first_layer_member_index.push_back(idx);
-        } else {
-            result.path[last_layer_member_index[my_layer]] = idx;
-            last_layer_member_index[my_layer] = idx;
-        }
-        idx++;
-    }
-    for (int layer = 0; layer < result.max_layer; layer++) {
-        if (result.path[last_layer_member_index[layer]] == (size_t)-1) {
-            result.path[last_layer_member_index[layer]] =
-                first_layer_member_index[layer + 1];
-        }
-    }
-    for (auto p : result.path) {
-        std::cerr << p << "\t";
-    }
-    std::cerr << "\n";
-    return result;
-}
 void updateLocalTransforms(
     Slice<Entity, Position, Rotation, Scale, LocalTransform> slice) {
     for (auto [e, pos, rot, scale, trans] : slice) {
@@ -84,14 +41,14 @@ void updateLocalTransforms(
 }
 void updateParentTransformByHierarchy(
     Slice<Entity, LocalTransform, GlobalTransform> slice,
-    const HierarchyGroup& hierarchy, LayerInfo layer_info) {
+    const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) {
     size_t to_update = 0;
     int iter = 0;
     while (to_update < slice.size()) {
         auto [e, my_trans, global_trans] = slice[to_update];
-        to_update = layer_info.path[to_update];
+        to_update = layer_info.second[to_update];
 
-        auto parent_maybe = hierarchy.cgetComponent<Parent>(e);
+        auto parent_maybe = hierarchy.cgetComponent<Hierarchy::Parent>(e);
         assert(parent_maybe.has_value());
         auto parent = *parent_maybe.value();
 
@@ -106,33 +63,32 @@ void updateParentTransformByHierarchy(
 }
 struct System {
     TransformGroup transforms;
-    HierarchyGroup hierarchy;
+    Hierarchy::System hierarchy;
     Entity world;
     std::unordered_map<Entity, sf::Color> color_table;
     std::unordered_map<Entity, std::string> name_table;
-    void add(Entity id, std::string name, Position p, Rotation r, Parent parent,
+    void add(Entity id, std::string name, Position p, Rotation r, Hierarchy::Parent parent,
              sf::Color color) {
         name_table[id] = name;
         transforms.push_back(id, p, r);
-        hierarchy.push_back(id, parent, Children{});
-        hierarchy.getComponent<Children>(parent).value()->push_back(id);
+        hierarchy.push_back(id, parent, Hierarchy::Children{});
+        hierarchy.getComponent<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
     }
     System() {
-        std::get<Parent>(hierarchy.default_values) = {world};
+        std::get<Hierarchy::Parent>(hierarchy.default_values) = world;
         std::get<LocalTransform>(transforms.default_values) =
             LocalTransform{sf::Transform::Identity};
         std::get<Scale>(transforms.default_values) = {{1.f, 1.f}};
         std::get<GlobalTransform>(transforms.default_values) =
             GlobalTransform{sf::Transform::Identity};
-        hierarchy.push_back(world);
+        hierarchy.push_back(world, Parent{world});
         transforms.push_back(world, Position{}, Rotation{0.f});
     }
 };
 
 int main() {
     System sys;
-
 
     Entity red;
     Entity magenta;
@@ -145,8 +101,8 @@ int main() {
     sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green);
     sys.add(blue,    "blue",    Position{{600.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Blue);
 
-    auto info = getLayerValues(sys.hierarchy.slice<Parent>());
-    std::cerr << info.max_layer << "\n";
+    auto info = Hierarchy::getBFSPath(sys.hierarchy.slice<Parent>());
+    std::cerr << info.first << "\n";
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(1000, 1000), "My window");

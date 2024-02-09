@@ -46,8 +46,8 @@ EPI_WRAP_TYPE(epi::Set<std::string>, Tag);
 EPI_WRAP_TYPE(epi::Set<std::string>, Mask);
 
 //funtions used
-std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const Transform& transform);
-AABB calcAABB(const std::vector<vec2f>& model_points, const Transform& transform);
+std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const sf::Transform& transform);
+AABB calcAABB(const std::vector<vec2f>& model_points, const sf::Transform& transform);
 float calcInertiaDevMass(const std::vector<std::vector<vec2f>>& model_points);
 
 //system
@@ -66,14 +66,14 @@ public:
         model_ref = model;
         auto& inertia_ref = *MasterClass::getComponent<InertiaDevMass>(owner).value();
         
-        auto dummy_transformed = transformPartitionShape(model, Transform::Identity);
+        auto dummy_transformed = transformPartitionShape(model, sf::Transform::Identity);
         inertia_ref = Collider::calcInertiaDevMass(dummy_transformed);
     }
     
     void push_back(Entity owner, const std::vector<vec2f>& model,
                    bool isTrigger = false, epi::Set<std::string> tags = {},
                    epi::Set<std::string> masks = {}) {
-        auto dummy_transformed = transformPartitionShape(model, Transform::Identity);
+        auto dummy_transformed = transformPartitionShape(model, sf::Transform::Identity);
         auto inertia = Collider::calcInertiaDevMass(dummy_transformed);
         MasterClass::push_back(owner, {model}, {isTrigger},
                 {inertia}, {tags}, {masks}, { ShapeTransformedPartitioned()});

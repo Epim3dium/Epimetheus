@@ -13,8 +13,19 @@ namespace epi {
 
 class SolverInterface {
 public:
-    virtual std::vector<CollisionInfo> detect(Transform* trans1, Collider* col1, Transform* trans2, Collider* col2) = 0;
-    virtual void solve(CollisionInfo info, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction) = 0;
+    virtual std::vector<CollisionInfo> detect(const Collider::ShapeTransformedPartitioned& col1, const Collider::ShapeTransformedPartitioned& col2) = 0;
+    virtual void solveOverlap(CollisionInfo info, bool isStatic1, vec2f& pos1, float& rot1, bool isStatic2, vec2f& pos2, float& rot2) = 0;
+    //if any object is static, then:
+    //mass = inf
+    //vel = 0
+    //ang_vel = 0
+    //inv_inertia = 0
+    //if any object has lockedRotation, then:
+    //inv_inertia = 0
+    //ang_vel = 0
+    virtual void processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
+            float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
+            float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) = 0;
 };
 class DefaultSolver : public SolverInterface {
 private:
@@ -23,12 +34,17 @@ private:
     static float getReactImpulse(const vec2f& rad1perp, float p1inertia, float mass1, const vec2f& rad2perp, float p2inertia, float mass2, 
             float restitution, const vec2f& rel_vel, vec2f cn);
 
-    static void processReaction(const CollisionInfo& info, const RigidManifold& rb1, 
-           const RigidManifold& rb2,float bounce, float sfric, float dfric);
+    static void processReaction(const CollisionInfo& info, const Rigibody::Manifold& rb1, 
+           const Rigibody::Manifold& rb2,float bounce, float sfric, float dfric);
 public:
 
-    std::vector<CollisionInfo> detect(Transform* trans1, Collider* col1, Transform* trans2, Collider* col2) override;
-    void solve(CollisionInfo info, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction) override;
+    std::vector<CollisionInfo> detect(const Collider::ShapeTransformedPartitioned& col1, const Collider::ShapeTransformedPartitioned& col2) override;
+    void solveOverlap(CollisionInfo info, 
+            bool isStatic1, vec2f& pos1, float& rot1, 
+            bool isStatic2, vec2f& pos2, float& rot2) override;
+    void processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
+            float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
+            float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) override;
 };
 
 }

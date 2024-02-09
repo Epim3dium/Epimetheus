@@ -24,73 +24,41 @@ CollisionInfo detectOverlap(const ConvexPolygon& p1, const ConvexPolygon& p2) {
     }
     return {false};
 }
-void handleOverlap(RigidManifold& m1, RigidManifold& m2, const CollisionInfo& man) {
-    if(!man.detected)
-        return;
-    auto& t1 = *m1.transform;
-    auto& t2 = *m2.transform;
+void DefaultSolver::processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
+        float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
+        float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) {
+    //isstatic, lockrotation, mass, velocity, angluarvelocity, globaltransform
+    //|
+    //V
+    //inv_inertia, mass, rad, vel, ang_vel 
 
-    constexpr float response_coef = 0.9f;
-    constexpr float pos_rot_response_ratio = 0.8f;
-    const float offset = man.overlap * response_coef;
-
-    auto rotateByOffest = [&man](vec2f contact_point, Transform& trans, float overlap) {
-        auto rad = trans.getPos() - contact_point;
-        auto rad_normal = normal(rad);
-        auto rot_diff = overlap / (2.f * EPI_PI * length(rad));
-        trans.setRot(trans.getRot() + rot_diff * cross(rad_normal, man.cn));
-    };
-
-    float inv_cps_size = 1.f / static_cast<float>(man.cps.size());
-
-    if(m2.rigidbody->isStatic) {
-        t1.setPos(t1.getPos() + man.cn * offset * pos_rot_response_ratio);
-
-        //for when it's 'lodged between 2 static objects'
-        for(auto cp : man.cps)
-            rotateByOffest(cp, t1, -offset * (1.f - pos_rot_response_ratio) * inv_cps_size);
-    } else if(m1.rigidbody->isStatic) {
-        t2.setPos(t2.getPos() - man.cn * offset * pos_rot_response_ratio);
-
-        for(auto cp : man.cps)
-            rotateByOffest(cp, t2, offset * (1.f - pos_rot_response_ratio) * inv_cps_size);
-    } else {
-        t1.setPos(t1.getPos() + man.cn * offset * 0.5f);
-        t2.setPos(t2.getPos() - man.cn * offset * 0.5f);
-    }
-}
-void DefaultSolver::processReaction(const CollisionInfo& info, const RigidManifold& m1, 
-       const RigidManifold& m2,float bounce, float sfric, float dfric)
-{
-    //auto cp = std::reduce(info.cps.begin(), info.cps.end()) / (float)info.cps.size();
-
-    auto& rb1 = *m1.rigidbody;
-    auto& rb2 = *m2.rigidbody;
-
-    float mass1 = rb1.isStatic ? INFINITY : rb1.mass;
-    float mass2 = rb2.isStatic ? INFINITY : rb2.mass;
-    float inv_inertia1 = 1.f / ((rb1.isStatic || rb1.lockRotation) ? INFINITY : m1.collider->getInertia(rb1.mass));
-    float inv_inertia2 = 1.f / ((rb2.isStatic || rb2.lockRotation) ? INFINITY : m2.collider->getInertia(rb2.mass));
-    vec2f vel1 = rb1.velocity;
-    vec2f vel2 = rb2.velocity;
-    float ang_vel1 = rb1.angular_velocity;
-    float ang_vel2 = rb2.angular_velocity;
+    // auto& rb1 = *m1.rigidbody;
+    // auto& rb2 = *m2.rigidbody;
+    //
+    // float mass1 = rb1.isStatic ? INFINITY : rb1.mass;
+    // float mass2 = rb2.isStatic ? INFINITY : rb2.mass;
+    // float inv_inertia1 = 1.f / ((rb1.isStatic || rb1.lockRotation) ? INFINITY : m1.collider->getInertia(rb1.mass));
+    // float inv_inertia2 = 1.f / ((rb2.isStatic || rb2.lockRotation) ? INFINITY : m2.collider->getInertia(rb2.mass));
+    // vec2f vel1 = rb1.velocity;
+    // vec2f vel2 = rb2.velocity;
+    // float ang_vel1 = rb1.angular_velocity;
+    // float ang_vel2 = rb2.angular_velocity;
 
 
     auto cp = std::reduce(info.cps.begin(), info.cps.end()) / (float)info.cps.size();
     vec2f impulse (0, 0);
 
-    vec2f rad1 = cp - m1.transform->getPos();
-    vec2f rad2 = cp - m2.transform->getPos();
+    // vec2f rad1 = cp - m1.transform->getPos();
+    // vec2f rad2 = cp - m2.transform->getPos();
 
     vec2f rad1perp(-rad1.y, rad1.x);
     vec2f rad2perp(-rad2.y, rad2.x);
 
-    vec2f p1ang_vel_lin = rb1.lockRotation ? vec2f(0, 0) : rad1perp * ang_vel1;
-    vec2f p2ang_vel_lin = rb2.lockRotation ? vec2f(0, 0) : rad2perp * ang_vel2;
+    vec2f p1ang_vel_lin = rad1perp * ang_vel1;
+    vec2f p2ang_vel_lin = rad2perp * ang_vel2;
 
-    vec2f vel_sum1 = rb1.isStatic ? vec2f(0, 0) : vel1 + p1ang_vel_lin;
-    vec2f vel_sum2 = rb2.isStatic ? vec2f(0, 0) : vel2 + p2ang_vel_lin;
+    vec2f vel_sum1 = vel1 + p1ang_vel_lin;
+    vec2f vel_sum2 = vel2 + p2ang_vel_lin;
 
     //calculate relative velocity
     vec2f rel_vel = vel_sum2 - vel_sum1;
@@ -100,10 +68,10 @@ void DefaultSolver::processReaction(const CollisionInfo& info, const RigidManifo
     impulse += info.cn * j - fj;
 
     float cps_ctr = (float)info.cps.size();
-    rb1.velocity -= impulse / rb1.mass;
-    rb1.angular_velocity += cross(impulse, rad1) * inv_inertia1;
-    rb2.velocity += impulse / rb2.mass;
-    rb2.angular_velocity -= cross(impulse, rad2) * inv_inertia2;
+    vel1 -= impulse / mass1;
+    ang_vel1 += cross(impulse, rad1) * inv_inertia1;
+    vel2 += impulse / mass2;
+    ang_vel2 -= cross(impulse, rad2) * inv_inertia2;
 }
 float DefaultSolver::getReactImpulse(const vec2f& rad1perp, float p1inv_inertia, float mass1, const vec2f& rad2perp, float p2inv_inertia, float mass2, 
         float restitution, const vec2f& rel_vel, vec2f cn) {
@@ -151,25 +119,44 @@ vec2f DefaultSolver::getFricImpulse(float p1inv_inertia, float mass1, vec2f rad1
     }
     return friction_impulse;
 }
-std::vector<CollisionInfo> DefaultSolver::detect(Transform* trans1, Collider* col1, Transform* trans2, Collider* col2) {
+std::vector<CollisionInfo> DefaultSolver::detect(const Collider::ShapeTransformedPartitioned& col1, const Collider::ShapeTransformedPartitioned& col2) {
     std::vector<CollisionInfo> result;
-    for(const auto& poly1 : col1->getPolygonShape(*trans1)) {
-        for(const auto& poly2 : col2->getPolygonShape(*trans2)) {
-            auto aabb1 = AABB::CreateFromVerticies(poly1.getVertecies());
-            auto aabb2 = AABB::CreateFromVerticies(poly2.getVertecies());
+    for(const auto& poly1 : col1) {
+        for(const auto& poly2 : col2) {
+            auto aabb1 = AABB::CreateFromVerticies(poly1);
+            auto aabb2 = AABB::CreateFromVerticies(poly2);
             if(!isOverlappingAABBAABB(aabb1, aabb2))
                 continue;
-            result.push_back(detectOverlap(poly1, poly2));
+            result.push_back(detectOverlap(ConvexPolygon::CreateFromPoints(poly1), ConvexPolygon::CreateFromPoints(poly2)));
         }
     }
     return result; 
 }
-void DefaultSolver::solve(CollisionInfo man, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction)  {
-    if(!man.detected) {
+void DefaultSolver::solveOverlap(CollisionInfo info, 
+        bool isStatic1, vec2f& pos1, float& rot1, 
+        bool isStatic2, vec2f& pos2, float& rot2) 
+{
+    if(!info.detected)
         return;
+
+    constexpr float response_coef = 0.9f;
+    const float offset = info.overlap * response_coef;
+
+    if(isStatic2) {
+        pos1 += info.cn * offset;
+    } else if(isStatic1) {
+        pos2 -= info.cn * offset;
+    } else {
+        pos1 += info.cn * offset * 0.5f;
+        pos2 -= info.cn * offset * 0.5f;
     }
-    handleOverlap(rb1, rb2, man);
-    processReaction(man, rb1, rb2, restitution, sfriction, dfriction);
 }
+// void DefaultSolver::solve(CollisionInfo man, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction)  {
+//     if(!man.detected) {
+//         return;
+//     }
+//     handleOverlap(rb1, rb2, man);
+//     processReaction(man, rb1, rb2, restitution, sfriction, dfriction);
+// }
 
 }

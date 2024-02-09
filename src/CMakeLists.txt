@@ -7,6 +7,7 @@ set(SOURCE_FILES
     math/geometry_func.cpp
     physics/collider.cpp
     physics/transform.cpp
+    core/hierarchy.cpp
     # physics/physics_manager.cpp
     # physics/restraint.cpp
     # physics/rigidbody.cpp
@@ -14,6 +15,7 @@ set(SOURCE_FILES
 )
 set(HEADER_FILES
     core/entity.hpp
+    core/hierarchy.hpp
     core/group.hpp
     core/slice.hpp
     memory/parallel_iterator.hpp
