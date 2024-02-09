@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "core/group.hpp"
+#include "physics/collider.hpp"
 #include "templates/primitive_wrapper.hpp"
 #include "imgui-SFML.h"
 #include "imgui.h"
@@ -90,7 +91,7 @@ void updateParentTransformByHierarchy(
         auto [e, my_trans, global_trans] = slice[to_update];
         to_update = layer_info.path[to_update];
 
-        auto parent_maybe = hierarchy.getComponent<Parent>(e);
+        auto parent_maybe = hierarchy.cgetComponent<Parent>(e);
         assert(parent_maybe.has_value());
         auto parent = *parent_maybe.value();
 
@@ -130,7 +131,6 @@ struct System {
 };
 
 int main() {
-
     System sys;
 
 

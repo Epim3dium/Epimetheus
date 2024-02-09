@@ -27,31 +27,31 @@ using std::mt19937;
 //from 1 to n
 //veci communities(n + 1, -1);
 
-Collider* getHead(Collider* col) {
-    if(col->parent_collider == col)
-        return col;
-    std::vector<Collider*> to_speed;
-    while(col->parent_collider != col) {
-        to_speed.push_back(col);
-        col = col->parent_collider;
-    }
-    for(auto t : to_speed)
-        t->parent_collider = col;
-    return col;
-}
-
-void Merge(Collider* a, Collider* b) {
-    a = getHead(a);
-    b = getHead(b);
-    if(a != b) {
-        b->parent_collider = a;
-    }
-}
-bool Friends(Collider* a, Collider* b) {
-    return getHead(a) == getHead(b);
-}
+// Collider* getHead(Collider* col) {
+//     if(col->parent_collider == col)
+//         return col;
+//     std::vector<Collider*> to_speed;
+//     while(col->parent_collider != col) {
+//         to_speed.push_back(col);
+//         col = col->parent_collider;
+//     }
+//     for(auto t : to_speed)
+//         t->parent_collider = col;
+//     return col;
+// }
+//
+// void Merge(Collider* a, Collider* b) {
+//     a = getHead(a);
+//     b = getHead(b);
+//     if(a != b) {
+//         b->parent_collider = a;
+//     }
+// }
+// bool Friends(Collider* a, Collider* b) {
+//     return getHead(a) == getHead(b);
+// }
 static bool isNotMoving(RigidManifold man) {
-    return man.collider->isSleeping || man.rigidbody->isStatic;
+    return man.rigidbody->isStatic;
 }
 
 static bool areCompatible(RigidManifold r1, RigidManifold r2) {
@@ -120,8 +120,8 @@ void PhysicsManager::processNarrowPhase(const std::vector<PhysicsManager::ColInf
             float sfriction = selectFrom(ci->first.material->sfriction, ci->second.material->sfriction, friction_select);
             float dfriction = selectFrom(ci->first.material->dfriction, ci->second.material->dfriction, friction_select);
             _solver->solve(col_info, ci->first, ci->second, restitution, sfriction, dfriction);
-            if(!ci->first.rigidbody->isStatic && !ci->second.rigidbody->isStatic)
-                Merge(ci->first.collider, ci->second.collider);
+            // if(!ci->first.rigidbody->isStatic && !ci->second.rigidbody->isStatic)
+            //     Merge(ci->first.collider, ci->second.collider);
         }
     }
 }
@@ -136,11 +136,11 @@ void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
         return;
     auto& rb = *man.rigidbody;
     //processing dormants
-    if(isSleepy && length(rb.velocity) < DORMANT_MIN_VELOCITY && abs(rb.angular_velocity) < DORMANT_MIN_ANGULAR_VELOCITY) {
-        man.collider->time_immobile += delT;
-    }else {
-        man.collider->time_immobile = 0.f;
-    }
+    // if(isSleepy && length(rb.velocity) < DORMANT_MIN_VELOCITY && abs(rb.angular_velocity) < DORMANT_MIN_ANGULAR_VELOCITY) {
+    //     man.collider->time_immobile += delT;
+    // }else {
+    //     man.collider->time_immobile = 0.f;
+    // }
 
     if(isNotMoving(man)){
         rb.velocity = vec2f();
@@ -168,34 +168,34 @@ void PhysicsManager::updateRigidbodies(float delT) {
     }
 }
 #define MIN_IMMOBILE_TIME_TO_SLEEP 1.f
-void PhysicsManager::processSleeping() {
-    std::set<Collider*> parent_colliders_woke;
-    for(auto r : _rigidbodies) {
-        if(r.collider->isTrigger)
-            continue;
-        if(r.rigidbody->isStatic)
-            continue;
-        if(r.collider->time_immobile < MIN_IMMOBILE_TIME_TO_SLEEP) {
-            parent_colliders_woke.insert(r.collider->parent_collider);
-        }
-    }
-    for(auto r : _rigidbodies) {
-        if(r.collider->isTrigger)
-            continue;
-        if(r.rigidbody->isStatic)
-            continue;
-
-        if(!parent_colliders_woke.contains(r.collider->parent_collider)) {
-            r.collider->isSleeping = true;
-        }else {
-            if(r.collider->isSleeping) {
-                r.collider->isSleeping = false;
-                r.collider->time_immobile = 0.f;
-            }
-            r.collider->parent_collider = r.collider;
-        }
-    }
-}
+// void PhysicsManager::processSleeping() {
+//     std::set<Collider*> parent_colliders_woke;
+//     for(auto r : _rigidbodies) {
+//         if(r.collider->isTrigger)
+//             continue;
+//         if(r.rigidbody->isStatic)
+//             continue;
+//         if(r.collider->time_immobile < MIN_IMMOBILE_TIME_TO_SLEEP) {
+//             parent_colliders_woke.insert(r.collider->parent_collider);
+//         }
+//     }
+//     for(auto r : _rigidbodies) {
+//         if(r.collider->isTrigger)
+//             continue;
+//         if(r.rigidbody->isStatic)
+//             continue;
+//
+//         if(!parent_colliders_woke.contains(r.collider->parent_collider)) {
+//             r.collider->isSleeping = true;
+//         }else {
+//             if(r.collider->isSleeping) {
+//                 r.collider->isSleeping = false;
+//                 r.collider->time_immobile = 0.f;
+//             }
+//             r.collider->parent_collider = r.collider;
+//         }
+//     }
+// }
 void PhysicsManager::update(float delT) {
     float deltaStep = delT / (float)steps;
 
@@ -206,7 +206,7 @@ void PhysicsManager::update(float delT) {
         processNarrowPhase(col_list);
     }
 
-    processSleeping();
+    // processSleeping();
     for(auto r : _rigidbodies) {
         r.rigidbody->force = {0.f, 0.f};
         r.rigidbody->angular_force = 0.f;
@@ -230,9 +230,9 @@ static void unbind_any(const T obj, std::vector<T>& obj_vec) {
     }
 }
 void PhysicsManager::remove(RigidManifold rb) {
-    rb.collider->time_immobile = 0.f;
-    rb.collider->parent_collider->time_immobile = 0.f;
-    processSleeping();
+    // rb.collider->time_immobile = 0.f;
+    // rb.collider->parent_collider->time_immobile = 0.f;
+    // processSleeping();
     unbind_any(rb, _rigidbodies);
 }
 void PhysicsManager::remove(const Restraint* res) {

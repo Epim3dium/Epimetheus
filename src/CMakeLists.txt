@@ -5,10 +5,12 @@ set(SOURCE_FILES
     math/types.cpp
     math/math_func.cpp
     math/geometry_func.cpp
-    physics/physics_manager.cpp
-    physics/restraint.cpp
-    physics/rigidbody.cpp
-    physics/solver.cpp
+    physics/collider.cpp
+    physics/transform.cpp
+    # physics/physics_manager.cpp
+    # physics/restraint.cpp
+    # physics/rigidbody.cpp
+    # physics/solver.cpp
 )
 set(HEADER_FILES
     core/entity.hpp

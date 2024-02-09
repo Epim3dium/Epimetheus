@@ -38,11 +38,8 @@ namespace PastelColor {
     const Color Gray =   Color(0x928374ff);
 };
 
-struct Circle;
-class ConvexPolygon;
-
-std::vector<ConvexPolygon> triangulate(const std::vector<vec2f>& points);
-std::vector<ConvexPolygon> partitionConvex(const std::vector<ConvexPolygon>& polygons);
+std::vector<std::vector<vec2f>> triangulate(const std::vector<vec2f>& points);
+std::vector<std::vector<vec2f>> partitionConvex(const std::vector<std::vector<vec2f>>& polygons);
 
 
 vec2f operator* (vec2f a, vec2f b);
