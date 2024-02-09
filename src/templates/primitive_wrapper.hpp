@@ -2,6 +2,20 @@
 #define EPI_PRiMITIVE_WRAPPER_HPP
 #include <type_traits>
 namespace epi {
+#define EPI_WRAP_TYPE(WrappedType, Name)\
+struct Name : public WrappedType {\
+    Name& operator=(const WrappedType& v) { *this = v; return *this; }\
+    Name& operator=(WrappedType&& v) { *this = v;      return *this; }\
+    Name(const WrappedType& v) : WrappedType(v) {}\
+    Name(WrappedType&& v) : WrappedType(v) {}\
+    \
+    Name(const Name& v) = default;\
+    Name(Name&& v) = default;\
+    Name& operator=(const Name& v) = default;\
+    Name& operator=(Name&& v) = default;\
+    Name(){}\
+}
+    
 template<typename T>
 class PrimitiveWrapper
 {

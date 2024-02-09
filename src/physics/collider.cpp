@@ -22,7 +22,11 @@ AABB calcAABB(const std::vector<vec2f>& model_points, const Transform& transform
     return result;
 }
 float calcInertiaDevMass(const std::vector<std::vector<vec2f>>& model_points) {
-    //calculateInertia(model_points, 1.f);
+    float result = 0.f;
+    for(auto& poly : model_points) {
+        result += calculateInertia(poly, 1.f);
+    }
+    return result;
 }
 
 }

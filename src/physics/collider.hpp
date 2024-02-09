@@ -38,42 +38,12 @@ struct ColliderEvent {
 };
 namespace Collider {
 //variables
-struct ShapeModel : public std::vector<vec2f> {
-    ShapeModel& operator=(const std::vector<vec2f>& vec) { *this = vec; return *this; }
-    ShapeModel& operator=(std::vector<vec2f>&& vec) { *this = vec;      return *this; }
-    ShapeModel(const std::vector<vec2f>& vec) : std::vector<vec2f>(vec) {}
-    ShapeModel(std::vector<vec2f>&& vec) : std::vector<vec2f>(vec) {}
-    ShapeModel(){}
-};
-struct ShapeTransformedPartitioned : public std::vector<std::vector<vec2f>> {
-    ShapeTransformedPartitioned& operator=(const std::vector<std::vector<vec2f>>& vec) { *this = vec; return *this; }
-    ShapeTransformedPartitioned& operator=(std::vector<std::vector<vec2f>>&& vec) { *this = vec;      return *this; }
-    ShapeTransformedPartitioned(const std::vector<std::vector<vec2f>>& vec) : std::vector<std::vector<vec2f>>(vec) {}
-    ShapeTransformedPartitioned(std::vector<std::vector<vec2f>>&& vec) : std::vector<std::vector<vec2f>>(vec) {}
-    ShapeTransformedPartitioned(){}
-};
-struct isTriggerFlag : PrimitiveWrapper<bool> {
-    isTriggerFlag(const bool& v) : PrimitiveWrapper<bool>(v) {}
-    isTriggerFlag(){}
-};
-struct InertiaDevMass : PrimitiveWrapper<float> {
-    InertiaDevMass(const float& v) : PrimitiveWrapper<float>(v) {}
-    InertiaDevMass(){}
-};
-struct Tag : epi::Set<std::string> {
-    Tag& operator=(const epi::Set<std::string>& vec) { *this = vec; return *this; }
-    Tag& operator=(epi::Set<std::string>&& vec) { *this = vec;      return *this; }
-    Tag(const epi::Set<std::string>& vec) : epi::Set<std::string>(vec) {}
-    Tag(epi::Set<std::string>&& vec) : epi::Set<std::string>(vec) {}
-    Tag(){}
-};
-struct Mask : epi::Set<std::string> {
-    Mask& operator=(const epi::Set<std::string>& vec) { *this = vec; return *this; }
-    Mask& operator=(epi::Set<std::string>&& vec) { *this = vec;      return *this; }
-    Mask(const epi::Set<std::string>& vec) : epi::Set<std::string>(vec) {}
-    Mask(epi::Set<std::string>&& vec) : epi::Set<std::string>(vec) {}
-    Mask(){}
-};
+EPI_WRAP_TYPE(std::vector<vec2f>, ShapeModel);
+EPI_WRAP_TYPE(std::vector<std::vector<vec2f>>, ShapeTransformedPartitioned);
+EPI_WRAP_TYPE(PrimitiveWrapper<bool>, isTriggerFlag);
+EPI_WRAP_TYPE(PrimitiveWrapper<float>, InertiaDevMass);
+EPI_WRAP_TYPE(epi::Set<std::string>, Tag);
+EPI_WRAP_TYPE(epi::Set<std::string>, Mask);
 
 //funtions used
 std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const Transform& transform);
