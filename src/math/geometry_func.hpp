@@ -5,6 +5,9 @@
 #include "math/types.hpp"
 
 namespace epi {
+    
+std::vector<std::vector<vec2f>> triangulate(const std::vector<vec2f>& points);
+std::vector<std::vector<vec2f>> partitionConvex(const std::vector<std::vector<vec2f>>& polygons);
 
 float calcTriangleVolume(vec2f a, vec2f b, vec2f c);
 //returns true if r1 contains the whole of r2

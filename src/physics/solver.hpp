@@ -33,9 +33,6 @@ private:
             float sfric, float dfric, float j, const vec2f& rel_vel, const vec2f& cn);
     static float getReactImpulse(const vec2f& rad1perp, float p1inertia, float mass1, const vec2f& rad2perp, float p2inertia, float mass2, 
             float restitution, const vec2f& rel_vel, vec2f cn);
-
-    static void processReaction(const CollisionInfo& info, const Rigibody::Manifold& rb1, 
-           const Rigibody::Manifold& rb2,float bounce, float sfric, float dfric);
 public:
 
     std::vector<CollisionInfo> detect(const Collider::ShapeTransformedPartitioned& col1, const Collider::ShapeTransformedPartitioned& col2) override;
