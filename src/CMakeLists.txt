@@ -8,10 +8,10 @@ set(SOURCE_FILES
     physics/collider.cpp
     physics/transform.cpp
     core/hierarchy.cpp
-    # physics/physics_manager.cpp
     # physics/restraint.cpp
-    # physics/rigidbody.cpp
-    # physics/solver.cpp
+    physics/rigidbody.cpp
+    physics/physics_manager.cpp
+    physics/solver.cpp
 )
 set(HEADER_FILES
     core/entity.hpp

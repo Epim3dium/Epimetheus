@@ -44,9 +44,8 @@ void updateParentTransformByHierarchy(
     const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) {
     size_t to_update = 0;
     int iter = 0;
-    while (to_update < slice.size()) {
-        auto [e, my_trans, global_trans] = slice[to_update];
-        to_update = layer_info.second[to_update];
+    for (auto to_update_index : layer_info.second) {
+        auto [e, my_trans, global_trans] = slice[to_update_index];
 
         auto parent_maybe = hierarchy.cgetComponent<Hierarchy::Parent>(e);
         assert(parent_maybe.has_value());
@@ -101,8 +100,10 @@ int main() {
     sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green);
     sys.add(blue,    "blue",    Position{{600.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Blue);
 
-    auto info = Hierarchy::getBFSPath(sys.hierarchy.slice<Parent>());
-    std::cerr << info.first << "\n";
+    auto info = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+    for(auto i : info.second) {
+        std::cerr << i << "\n";
+    }
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(1000, 1000), "My window");
@@ -126,14 +127,14 @@ int main() {
         // clear the window with black color
         window.clear(sf::Color::Black);
         updateLocalTransforms(
-            sys.transforms.slice<Position, Rotation, Scale, LocalTransform>());
+            sys.transforms.sliceOwner<Position, Rotation, Scale, LocalTransform>());
         updateParentTransformByHierarchy(
-            sys.transforms.slice<LocalTransform, GlobalTransform>(),
+            sys.transforms.sliceOwner<LocalTransform, GlobalTransform>(),
             sys.hierarchy, info);
 
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
-        for (auto [e, global_trans] : sys.transforms.slice<GlobalTransform>()) {
+        for (auto [e, global_trans] : sys.transforms.sliceOwner<GlobalTransform>()) {
             positions.push_back(global_trans.transformPoint(0.f, 0.f));
             ids.push_back(e);
         }

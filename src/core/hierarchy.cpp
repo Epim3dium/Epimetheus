@@ -3,7 +3,7 @@
 namespace epi {
 namespace Hierarchy {
     
-std::pair<int, std::vector<size_t> > getBFSPath(Slice<Entity, Parent> slice) {
+std::pair<int, std::vector<size_t> > getBFSIndexList(Slice<Entity, Parent> slice) {
     std::vector<size_t> path;
     int max_depth = -1;
     
@@ -36,7 +36,14 @@ std::pair<int, std::vector<size_t> > getBFSPath(Slice<Entity, Parent> slice) {
                 first_layer_member_index[layer + 1];
         }
     }
-    return {max_depth, path};
+    std::vector<size_t> index_list(path.size());
+    index_list[0] = 0;
+    size_t cur_path_node = 0U;
+    for(int i = 1; i < path.size(); i++) {
+        cur_path_node = path[cur_path_node];
+        index_list[i] = cur_path_node;
+    }
+    return {max_depth, index_list};
 }
 }
 

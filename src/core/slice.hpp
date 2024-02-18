@@ -18,6 +18,12 @@ struct is_present {
     static constexpr bool value {(std::is_same_v<What, Args> || ...)};
 };
 
+
+template<typename First, typename... Ts>
+struct isFirstEntity {
+    static constexpr bool value = std::is_same<First, Entity>::value;
+};
+
 template <class ...Types>
 class Slice {
     using tuple_type = typename tuple_of_spans<std::tuple<Types...>>::type;
@@ -100,5 +106,6 @@ public:
             }, m_data_spans); 
     }
 };
+
 }
 #endif

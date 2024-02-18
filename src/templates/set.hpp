@@ -8,6 +8,9 @@ namespace epi {
 
 template <class T, class CMP = std::less<T>, class ALLOC = std::allocator<T>>
 struct Set : public std::set<T, CMP, ALLOC> {
+    operator bool() const {
+        return this->size() != 0;
+    }
     Set operator^(const std::set<T, CMP, ALLOC>& s2)const;
     Set operator+(const std::set<T, CMP, ALLOC>& s2)const;
     

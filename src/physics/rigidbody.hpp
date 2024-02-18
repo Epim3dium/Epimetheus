@@ -14,7 +14,7 @@
 
 namespace epi {
 
-namespace Rigibody {
+namespace Rigidbody {
 EPI_WRAP_TYPE(PrimitiveWrapper<bool>, isStaticFlag);
 EPI_WRAP_TYPE(PrimitiveWrapper<bool>, lockRotationFlag);
 EPI_WRAP_TYPE(vec2f, Force);

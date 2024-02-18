@@ -61,7 +61,7 @@ TEST(group, group_iteration_and_slicing) {
     }
     ASSERT_EQ(cur_set_check.size(), 0U);
 
-    auto rot_slice = transforms.slice<rotation>();
+    auto rot_slice = transforms.sliceOwner<rotation>();
     cur_set_check = used_entities;
     for(auto [e, rot] : rot_slice) {
         ASSERT_EQ(rot.val, default_rot);
@@ -143,4 +143,18 @@ TEST(group, group_reverse_iterating) {
     auto sword_pos = hierarchy.getComponent<global_position>(sword).value();
     ASSERT_EQ(sword_pos->x, 50 + 100 + 100);
     ASSERT_EQ(sword_pos->y, 50 + 100);
+}
+TEST(group, owner_slice) {
+    Group<position> transforms;
+    Entity entities[4];
+    transforms.push_back(entities[0], {0.f, 0.f});
+    transforms.push_back(entities[1], {100.f, 100.f});
+    transforms.push_back(entities[2], {200.f, 100.f});
+    transforms.push_back(entities[3], {1000.f, 0.f});
+    size_t idx = 0;
+    std::vector<Entity> entities_check;
+    for(auto [owner] : transforms.sliceOwner<>()) {
+        ASSERT_EQ(owner, entities[idx++]);
+        entities_check.push_back(owner);
+    }
 }
