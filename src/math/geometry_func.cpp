@@ -84,14 +84,14 @@ static tryMergingToConvex(vec2f avg, const std::vector<vec2f>& points0,
     }
     return {true, point_merge};
 }
-static std::vector<ConvexPolygon>
-partitionConvexDIY(const std::vector<ConvexPolygon>& polygons) {
+static std::vector<std::vector<vec2f>>
+partitionConvexDIY(const std::vector<std::vector<vec2f>>& polygons) {
     std::vector<bool> wasIncluded(polygons.size(), false);
-    std::vector<ConvexPolygon> result;
+    std::vector<std::vector<vec2f>> result;
     for (int i = 0; i < polygons.size(); i++) {
         if (wasIncluded[i])
             continue;
-        ConvexPolygon current = polygons[i];
+        ConvexPolygon current = ConvexPolygon::CreateFromPoints( polygons[i]);
         wasIncluded[i] = true;
         bool wasFound = true;
         while (wasFound) {
@@ -100,11 +100,11 @@ partitionConvexDIY(const std::vector<ConvexPolygon>& polygons) {
                 if (wasIncluded[ii])
                     continue;
                 if (!hasSharedEdge(current.getVertecies(),
-                                   polygons[ii].getVertecies()))
+                                   polygons[ii]))
                     continue;
                 auto convexMerge =
                     tryMergingToConvex(current.getPos(), current.getVertecies(),
-                                       polygons[ii].getVertecies());
+                                       polygons[ii]);
                 if (!convexMerge.first)
                     continue;
                 current = ConvexPolygon::CreateFromPoints(convexMerge.second);
@@ -113,7 +113,7 @@ partitionConvexDIY(const std::vector<ConvexPolygon>& polygons) {
                 break;
             }
         }
-        result.push_back(current);
+        result.push_back(current.getVertecies());
     }
     return result;
 }

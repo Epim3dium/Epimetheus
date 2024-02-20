@@ -96,10 +96,12 @@ int main() {
     Entity yellow;
     Entity green;
     Entity blue;
+    
     sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{45.f}, Parent{sys.world}, sf::Color::Red);
     sys.rb_sys.push_back(red, {false}, {false}, {vec2f()}, {vec2f()}, {0.f}, {0.f}, {1.f});
     sys.mat_sys.push_back(red, {0.f}, {0.f}, {0.f}, {0.1f});
-    sys.col_sys.push_back(red, {vec2f(-10.f, -10.f), vec2f(10.f, -10.f), vec2f(10.f, 10.f), vec2f(-10.f, 10.f)});
+    std::vector<vec2f> model = {vec2f(10.f, 10.f), vec2f(10.f, -10.f), vec2f(-10.f, -10.f), vec2f(-15.f, 0.f), vec2f(-10.f, 10.f)};
+    sys.col_sys.push_back(red, model);
     sys.add(magenta, "magenta", Position{{100.f, 100.f}}, Rotation{},     Parent{red},       sf::Color::Magenta);
     sys.add(yellow,  "yellow",  Position{{10.f,  0.f}},   Rotation{},     Parent{magenta},   sf::Color::Yellow);
     sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green);
@@ -153,6 +155,20 @@ int main() {
             cs.setPosition(positions[i]);
             cs.setFillColor(sys.color_table[ids[i]]);
             window.draw(cs);
+        }
+        Collider::updateCollisionShapes(sys.col_sys.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(), sys.transforms.slice<Transform::GlobalTransform>());
+        for(auto [shape] : sys.col_sys.slice<Collider::ShapeTransformedPartitioned>()) {
+            sf::Vertex vert[2];
+            vert[0].color = sf::Color::Cyan;
+            vert[1].color = sf::Color::Cyan;
+            for(auto& convex : shape) {
+                vert[0].position = convex.back();
+                for(auto& point : convex) {
+                    vert[1] = point;
+                    window.draw(vert, 2U, sf::Lines);
+                    vert[0] = vert[1];
+                }
+            }
         }
         {
             auto convertToImVec = [](sf::Vector2f vec) {

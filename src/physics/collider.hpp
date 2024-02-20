@@ -57,11 +57,11 @@ class System
     
 public:
     template<class CompTy>
-    std::optional<CompTy*> getComponent(Entity owner) {
+    std::optional<CompTy*> get(Entity owner) {
         static_assert(std::is_same<CompTy, ShapeModel>::value == false);
         return MasterClass::get<CompTy>(owner);
     }
-    void setComponent(Entity owner, ShapeModel model) {
+    void setModel(Entity owner, ShapeModel model) {
         auto& model_ref = *MasterClass::get<ShapeModel>(owner).value();
         model_ref = model;
         auto& inertia_ref = *MasterClass::get<InertiaDevMass>(owner).value();
@@ -80,6 +80,8 @@ public:
     }
     System() {}
 };
+void updateCollisionShapes(Slice<Entity, ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice);
+
 };
 
 }
