@@ -27,7 +27,8 @@ private:
         Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform, Transform::GlobalTransform,
         Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag, Rigidbody::Force, Rigidbody::Velocity, Rigidbody::AngularForce, Rigidbody::AngularVelocity, Rigidbody::Mass,
         Material::AirDrag, Material::StaticFric, Material::DynamicFric, Material::Restitution,
-        Collider::isTriggerFlag, Collider::ShapeModel, Collider::InertiaDevMass, Collider::Tag, Collider::Mask, Collider::ShapeTransformedPartitioned> CollisionManifoldGroup;
+        Collider::isTriggerFlag, Collider::ShapeModel, Collider::InertiaDevMass, Collider::Tag, Collider::Mask, Collider::ShapeTransformedPartitioned>
+            CollisionManifoldGroup;
     template<class T>
     static T selectFrom(T a, T b, eSelectMode mode) {
         switch (mode) {
@@ -41,15 +42,23 @@ private:
     std::unique_ptr<SolverInterface> _solver =
         std::make_unique<DefaultSolver>();
 
-    std::vector<ColParticipants> processBroadPhase(Slice<Entity, Collider::ShapeTransformedPartitioned> slice);
-    void processNarrowPhase(const std::vector<ColParticipants>& col_info);
-    void resetMaskedVelocities(
-        Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force, Rigidbody::AngularForce> slice,
-        const std::vector<bool>& mask);
+    std::vector<ColParticipants> processBroadPhase(Slice<Entity, Collider::ShapeTransformedPartitioned> slice) const;
+    std::vector<ColParticipants> filterBroadPhaseResults(const CollisionManifoldGroup& group, const std::vector<ColParticipants> broad_result) const;
+    
+    std::vector<std::vector<CollisionInfo>> detectCollisions(CollisionManifoldGroup& group, const std::vector<ColParticipants>& col_list) const;
+    void solveOverlaps(CollisionManifoldGroup& group, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const;
+    void processReactions(CollisionManifoldGroup& group, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const;
+    
+    void processNarrowPhase(CollisionManifoldGroup& colliding, const std::vector<ColParticipants>& col_info) const;
+    void resetNonMovingObjects(Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
+                                     Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>
+                                   slice) const;
+    void copyResultingVelocities(Slice<Entity, Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
+    void copyResultingTransforms(Slice<Entity, Transform::Position, Transform::Rotation> result_slice, Transform::System& trans_sys) const; 
 
     //group contains only objects that can collide and react to collisions
     CollisionManifoldGroup createCollidingObjectsGroup(Transform::System& trans_sys, Rigidbody::System& rb_sys,
-                                                       Collider::System& col_sys, Material::System& mat_sys);
+                                                       Collider::System& col_sys, Material::System& mat_sys) const;
 
 public :
     // number of physics/collision steps per frame
@@ -63,7 +72,7 @@ public :
      */
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
-                float delT);
+                float delT) const;
 
     // mode used to select bounce when colliding
     eSelectMode bounciness_select = eSelectMode::Min;
