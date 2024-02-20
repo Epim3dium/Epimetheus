@@ -27,8 +27,8 @@ TEST(group, adding_removing_accessing) {
     transforms.push_back(enemy2, {200.f, 100.f}, {0.f}, {1.5f, 1.5f});
     ASSERT_EQ(transforms.size(), 3U);
     
-    ASSERT_TRUE(transforms.getComponent<scale>(enemy2).has_value());
-    auto scale2 = transforms.getComponent<scale>(enemy2).value();
+    ASSERT_TRUE(transforms.get<scale>(enemy2).has_value());
+    auto scale2 = transforms.get<scale>(enemy2).value();
     ASSERT_EQ(scale2->x, 1.5f);
     ASSERT_EQ(scale2->y, 1.5f);
 
@@ -136,11 +136,11 @@ TEST(group, group_reverse_iterating) {
             gpos = pos;
             continue;
         }
-        auto parents_position = hierarchy.getComponent<global_position>(parent.val);
+        auto parents_position = hierarchy.get<global_position>(parent.val);
         ASSERT_TRUE(parents_position.has_value());
         gpos = {parents_position.value()->x + pos.x, parents_position.value()->y + pos.y};
     }
-    auto sword_pos = hierarchy.getComponent<global_position>(sword).value();
+    auto sword_pos = hierarchy.get<global_position>(sword).value();
     ASSERT_EQ(sword_pos->x, 50 + 100 + 100);
     ASSERT_EQ(sword_pos->y, 50 + 100);
 }

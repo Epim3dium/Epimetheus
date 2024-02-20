@@ -47,14 +47,14 @@ void updateParentTransformByHierarchy(
     for (auto to_update_index : layer_info.second) {
         auto [e, my_trans, global_trans] = slice[to_update_index];
 
-        auto parent_maybe = hierarchy.cgetComponent<Hierarchy::Parent>(e);
+        auto parent_maybe = hierarchy.cget<Hierarchy::Parent>(e);
         assert(parent_maybe.has_value());
         auto parent = *parent_maybe.value();
 
         if (parent == e)
             continue;
 
-        auto global_trans_maybe = slice.getComponent<GlobalTransform>(parent);
+        auto global_trans_maybe = slice.get<GlobalTransform>(parent);
         assert(global_trans_maybe.has_value());
         global_trans = *global_trans_maybe.value();
         global_trans.combine(my_trans);
@@ -71,7 +71,7 @@ struct System {
         name_table[id] = name;
         transforms.push_back(id, p, r);
         hierarchy.push_back(id, parent, Hierarchy::Children{});
-        hierarchy.getComponent<Hierarchy::Children>(parent).value()->push_back(id);
+        hierarchy.get<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
     }
     System() {
@@ -177,7 +177,7 @@ int main() {
                 ImGui::BeginChild(("tab " + name).c_str());
                 ImGui::Text("%s", (name + " settings:").c_str());
                 auto& ref_pos =
-                    *sys.transforms.getComponent<Position>(e).value();
+                    *sys.transforms.get<Position>(e).value();
                 auto height = window.getView().getSize().y;
                 ref_pos.y = height - ref_pos.y;
                 slider2D(name + " pos", &ref_pos, {0.f, 0.f},
@@ -185,12 +185,12 @@ int main() {
                 ref_pos.y = height - ref_pos.y;
 
                 auto& ref_scale =
-                    *sys.transforms.getComponent<Scale>(e).value();
+                    *sys.transforms.get<Scale>(e).value();
                 slider2D(name + " scale", &ref_scale, {-2.f, -2.f}, {2.f, 2.f},
                          1.f);
 
                 auto& ref_rotate =
-                    *sys.transforms.getComponent<Rotation>(e).value();
+                    *sys.transforms.get<Rotation>(e).value();
                 ImGui::SliderFloat((name + " rotation").c_str(),
                                    &ref_rotate.val, 0.f, 360.f);
                 ImGui::EndChild();

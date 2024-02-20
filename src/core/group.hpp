@@ -114,7 +114,7 @@ public:
         return {};
     }
     template<class CompTy>
-    std::optional<CompTy*> getComponent(Entity entity) {
+    std::optional<CompTy*> get(Entity entity) {
         static_assert(is_present<CompTy, Types...>::value);
         auto index_found = getIndex(entity);
         if(!index_found.has_value()) {
@@ -125,7 +125,7 @@ public:
         
     }
     template<class CompTy>
-    std::optional<const CompTy *> cgetComponent(Entity entity) const {
+    std::optional<const CompTy *> cget(Entity entity) const {
         static_assert(is_present<CompTy, Types...>::value);
         auto index_found = getIndex(entity);
         if(!index_found.has_value()) {
