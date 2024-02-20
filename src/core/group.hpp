@@ -44,12 +44,18 @@ class Group {
         m_entityToIndex.at(m_entity_ids[idx2]) = idx1;
         std::swap(m_entity_ids[idx1], m_entity_ids[idx2]);
     }
-public:
     std::tuple<Types...> default_values;
+public:
     using iterator = RawParallelIterator<Entity, Types...>;
     using const_iterator = RawParallelIterator<const Entity, const Types...>;
     using reverse_iterator = RawReverseParallelIterator<Entity, Types...>;
     using const_reverse_iterator = RawReverseParallelIterator<const Entity, const Types...>;
+
+    template<class Type>
+    void setDefault(const Type& def) {
+        static_assert(is_present<Type, Types...>::value);
+        std::get<Type>(default_values) = def;
+    }
     
     size_t size() const {
         return m_size;
@@ -167,6 +173,7 @@ public:
     }
     template<class ...InitializedTypes>
     void push_back(Entity entity, InitializedTypes... args){
+        static_assert((is_present<InitializedTypes, Types...>::value && ...), "wrong initializing of types");
         m_entity_ids.push_back(entity);
         
         std::tuple<Types...> init_values = default_values;

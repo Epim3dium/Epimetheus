@@ -48,17 +48,33 @@ private:
     std::vector<std::vector<CollisionInfo>> detectCollisions(CollisionManifoldGroup& group, const std::vector<ColParticipants>& col_list) const;
     void solveOverlaps(CollisionManifoldGroup& group, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const;
     void processReactions(CollisionManifoldGroup& group, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const;
-    
+    //V
     void processNarrowPhase(CollisionManifoldGroup& colliding, const std::vector<ColParticipants>& col_info) const;
+    
     void resetNonMovingObjects(Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
-                                     Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>
-                                   slice) const;
+         Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag> slice) const;
     void copyResultingVelocities(Slice<Entity, Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
     void copyResultingTransforms(Slice<Entity, Transform::Position, Transform::Rotation> result_slice, Transform::System& trans_sys) const; 
 
     //group contains only objects that can collide and react to collisions
     CollisionManifoldGroup createCollidingObjectsGroup(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                                                        Collider::System& col_sys, Material::System& mat_sys) const;
+    template<class IntegratorT, class IntegrateeT>
+    void integrateAny(float delT, Slice<IntegratorT, IntegrateeT> slice) const {
+        for(auto [a, b] : slice) {
+            b += a * delT;
+        }
+    }
+    // void integrateForce          (float delT, Slice<Rigidbody::Force, Rigidbody::Velocity> slice) const;
+    // void integrateAngularForce   (float delT, Slice<Rigidbody::AngularForce, Rigidbody::AngularVelocity> slice) const;
+    // 
+    // void integrateVelocity       (float delT, Slice<Rigidbody::Velocity, Transform::Position> slice) const;
+    // void integrateAngularVelocity(float delT, Slice<Rigidbody::AngularVelocity, Transform::Rotation> slice) const;
+
+    void applyVelocityDrag       (float delT, Slice<Rigidbody::Velocity, Material::AirDrag> slice) const;
+    void applyAngularVelocityDrag(float delT, Slice<Rigidbody::AngularVelocity, Material::AirDrag> slice) const;
+
+    void integrate(float delT, CollisionManifoldGroup& group) const;
 
 public :
     // number of physics/collision steps per frame

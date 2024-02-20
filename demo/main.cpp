@@ -6,6 +6,8 @@
 #include "core/hierarchy.hpp"
 #include "core/group.hpp"
 #include "physics/collider.hpp"
+#include "physics/physics_manager.hpp"
+#include "physics/rigidbody.hpp"
 #include "templates/primitive_wrapper.hpp"
 #include "imgui-SFML.h"
 #include "imgui.h"
@@ -18,14 +20,11 @@ bool SliderScalar2D(char const* pLabel, float* fValueX, float* fValueY,
 bool InputVec2(char const* pLabel, ImVec2* pValue, ImVec2 const vMinValue,
                ImVec2 const vMaxValue, float const fScale /*= 1.0f*/);
 
-struct Position : public sf::Vector2f {};
-struct Rotation {
-    float val = 0.f;
-};
-struct Scale : public sf::Vector2f {};
-struct LocalTransform : public sf::Transform {};
-struct GlobalTransform : public sf::Transform {};
-
+using Transform::Position;
+using Transform::Rotation;
+using Transform::Scale;
+using Transform::LocalTransform;
+using Transform::GlobalTransform;
 using Hierarchy::Parent;
 
 typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
@@ -35,7 +34,7 @@ void updateLocalTransforms(
     for (auto [e, pos, rot, scale, trans] : slice) {
         trans = {sf::Transform::Identity};
         trans.translate(pos);
-        trans.rotate(rot.val);
+        trans.rotate(rot);
         trans.scale(scale);
     }
 }
@@ -60,13 +59,18 @@ void updateParentTransformByHierarchy(
         global_trans.combine(my_trans);
     }
 }
+
 struct System {
-    TransformGroup transforms;
+    Transform::System transforms;
     Hierarchy::System hierarchy;
+    Rigidbody::System rb_sys;
+    Collider::System col_sys;
+    Material::System mat_sys;
+    PhysicsManager phy_man;
     Entity world;
     std::unordered_map<Entity, sf::Color> color_table;
     std::unordered_map<Entity, std::string> name_table;
-    void add(Entity id, std::string name, Position p, Rotation r, Hierarchy::Parent parent,
+    void add(Entity id, std::string name, Transform::Position p, Transform::Rotation r, Hierarchy::Parent parent,
              sf::Color color) {
         name_table[id] = name;
         transforms.push_back(id, p, r);
@@ -75,12 +79,10 @@ struct System {
         color_table[id] = color;
     }
     System() {
-        std::get<Hierarchy::Parent>(hierarchy.default_values) = world;
-        std::get<LocalTransform>(transforms.default_values) =
-            LocalTransform{sf::Transform::Identity};
-        std::get<Scale>(transforms.default_values) = {{1.f, 1.f}};
-        std::get<GlobalTransform>(transforms.default_values) =
-            GlobalTransform{sf::Transform::Identity};
+        hierarchy.setDefault(Hierarchy::Parent(world));
+        transforms.setDefault<Transform::LocalTransform>(Transform::LocalTransform::Identity);
+        transforms.setDefault(Transform::Scale(vec2f(1.f, 1.f)));
+        transforms.setDefault<Transform::GlobalTransform>(Transform::GlobalTransform::Identity);
         hierarchy.push_back(world, Parent{world});
         transforms.push_back(world, Position{}, Rotation{0.f});
     }
@@ -95,6 +97,9 @@ int main() {
     Entity green;
     Entity blue;
     sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{45.f}, Parent{sys.world}, sf::Color::Red);
+    sys.rb_sys.push_back(red, {false}, {false}, {vec2f()}, {vec2f()}, {0.f}, {0.f}, {1.f});
+    sys.mat_sys.push_back(red, {0.f}, {0.f}, {0.f}, {0.1f});
+    sys.col_sys.push_back(red, {vec2f(-10.f, -10.f), vec2f(10.f, -10.f), vec2f(10.f, 10.f), vec2f(-10.f, 10.f)});
     sys.add(magenta, "magenta", Position{{100.f, 100.f}}, Rotation{},     Parent{red},       sf::Color::Magenta);
     sys.add(yellow,  "yellow",  Position{{10.f,  0.f}},   Rotation{},     Parent{magenta},   sf::Color::Yellow);
     sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green);
@@ -122,7 +127,8 @@ int main() {
                 window.close();
             ImGui::SFML::ProcessEvent(event);
         }
-        ImGui::SFML::Update(window, delTclock.restart());
+        auto delTtime = delTclock.restart();
+        ImGui::SFML::Update(window, delTtime);
 
         // clear the window with black color
         window.clear(sf::Color::Black);
@@ -138,6 +144,7 @@ int main() {
             positions.push_back(global_trans.transformPoint(0.f, 0.f));
             ids.push_back(e);
         }
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, delTtime.asSeconds());
 
         sf::CircleShape cs;
         cs.setRadius(5.f);
@@ -191,8 +198,9 @@ int main() {
 
                 auto& ref_rotate =
                     *sys.transforms.get<Rotation>(e).value();
+                float& f = ref_rotate;
                 ImGui::SliderFloat((name + " rotation").c_str(),
-                                   &ref_rotate.val, 0.f, 360.f);
+                                   &f, 0.f, 360.f);
                 ImGui::EndChild();
             }
             ImGui::End();

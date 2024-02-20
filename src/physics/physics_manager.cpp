@@ -183,20 +183,27 @@ void PhysicsManager::processReactions(CollisionManifoldGroup& group, const std::
             float inv_inertia;
             float mass;
             vec2f* vel;
-            float* angvel;
-        }objects[2];
-        size_t ii = 0;
+            float* ang_vel;
+        }tmp[3];
+        size_t ii = 1;
         for(auto e : {entity1, entity2}) {
-            objects[ii].mass = *group.cget<Rigidbody::Mass>(e).value();
-            objects[ii].inv_inertia = *group.cget<Collider::InertiaDevMass>(e).value();
-            objects[ii].vel = group.get<Rigidbody::Velocity>(e).value();
+            tmp[ii].mass = *group.cget<Rigidbody::Mass>(e).value();
+            tmp[ii].inv_inertia = *group.cget<Collider::InertiaDevMass>(e).value();
+            tmp[ii].vel = group.get<Rigidbody::Velocity>(e).value();
             float& f = (*group.get<Rigidbody::AngularVelocity>(e).value());
-            objects[ii].angvel = &f;
+            tmp[ii].ang_vel = &f;
+            ii++;
         }
         for(const auto& info : col_info[i]) {
             if(!info.detected)
                 continue;
-            _solver->processReaction(info, sfric, dfric, bounce, float inv_inertia1, float mass1, vec2f rad1, vec2f &vel1, float &ang_vel1, float inv_inertia2, float mass2, vec2f rad2, vec2f &vel2, float &ang_vel2)
+            vec2f rad1, rad2;
+            auto cp = std::reduce(info.cps.begin(), info.cps.end()) / (float)info.cps.size();
+            rad1 = cp - *group.get<Transform::Position>(entity1).value();
+            rad2 = cp - *group.get<Transform::Position>(entity2).value();
+            _solver->processReaction(info, sfric, dfric, bounce, 
+                    tmp[1].inv_inertia, tmp[1].mass, rad1, *tmp[1].vel, *tmp[1].ang_vel, 
+                    tmp[2].inv_inertia, tmp[2].mass, rad2, *tmp[2].vel, *tmp[2].ang_vel);
         }
     }
 }
@@ -269,7 +276,7 @@ PhysicsManager::CollisionManifoldGroup PhysicsManager::createCollidingObjectsGro
                                                                                    Material::System& mat_sys) const 
 {
     CollisionManifoldGroup colliding_objects;
-    for(auto [o] : colliding_objects.sliceOwner<>()) {
+    for(auto [o] : rb_sys.sliceOwner<>()) {
         auto owner = o;
         auto rb_idx_maybe = rb_sys.sliceAll().getIndex(owner);
         assert(rb_idx_maybe.has_value());
@@ -283,7 +290,6 @@ PhysicsManager::CollisionManifoldGroup PhysicsManager::createCollidingObjectsGro
     auto updateSystem = [&](auto sys) {
         for(auto [o] : colliding_objects.sliceOwner<>()) {
             auto owner = o;
-                continue;
             auto idx_maybe = sys.sliceAll().getIndex(owner);
             assert(idx_maybe.has_value());
             size_t idx = idx_maybe.value();
@@ -346,6 +352,31 @@ void PhysicsManager::copyResultingTransforms(Slice<Entity, Transform::Position, 
         (*trans_sys.get<Transform::Rotation>(owner).value()) = rot;
     }
 }
+void PhysicsManager::applyVelocityDrag       (float delT, Slice<Rigidbody::Velocity, Material::AirDrag> slice) const  {
+    for(auto [vel, drag] : slice) {
+        if(!nearlyEqual(qlen(vel), 0.f))
+            vel -= normal(vel) * std::clamp(qlen(vel) * drag, 0.f, length(vel)) * delT;
+    }
+}
+void PhysicsManager::applyAngularVelocityDrag(float delT, Slice<Rigidbody::AngularVelocity, Material::AirDrag> slice) const {
+    for(auto [ang_vel, drag] : slice) {
+        if(!nearlyEqual(ang_vel, 0.f))
+            ang_vel -= std::copysign(1.f, ang_vel) * std::clamp(ang_vel * ang_vel * drag, 0.f, abs(ang_vel)) * delT;
+    }
+}
+void PhysicsManager::integrate( float delT, CollisionManifoldGroup& group) const {
+    integrateAny          (delT, group.slice<Rigidbody::Force, Rigidbody::Velocity>              ());
+    integrateAny          (delT, group.slice<Rigidbody::AngularForce, Rigidbody::AngularVelocity>());
+
+    applyVelocityDrag       (delT, group.slice<Rigidbody::Velocity, Material::AirDrag>             ());
+    applyAngularVelocityDrag(delT, group.slice<Rigidbody::AngularVelocity, Material::AirDrag>      ());
+    
+    integrateAny          (delT, group.slice<Rigidbody::Velocity, Transform::Position>           ());
+    integrateAny          (delT, group.slice<Rigidbody::AngularVelocity, Transform::Rotation>    ());
+    for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
+        vel.y += delT * 100.f;
+    }
+}
 
 void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
             Collider::System& col_sys, Material::System& mat_sys,
@@ -354,13 +385,14 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     float deltaStep = delT / (float)steps;
     auto colliding_objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
     
-    auto pot_col_list = processBroadPhase(colliding_objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
-    auto col_list = filterBroadPhaseResults(colliding_objects, pot_col_list);
+    auto potential_col_list = processBroadPhase(colliding_objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
+    auto col_list = filterBroadPhaseResults(colliding_objects, potential_col_list);
     
     resetNonMovingObjects( colliding_objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
                                 Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
     
     for(int i = 0; i < steps; i++) {
+        integrate(deltaStep, colliding_objects);
         // updateRestraints(deltaStep);
         // updateRigidbodies(deltaStep);
         // processNarrowPhase(col_list);
