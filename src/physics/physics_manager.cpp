@@ -132,7 +132,7 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Collisi
     result.reserve(col_list.size());
     for(auto [entity1, entity2] : col_list) {
         const auto& shape1 = (*group.cget<Collider::ShapeTransformedPartitioned>(entity1).value());
-        const auto& shape2 = (*group.cget<Collider::ShapeTransformedPartitioned>(entity1).value());
+        const auto& shape2 = (*group.cget<Collider::ShapeTransformedPartitioned>(entity2).value());
         auto col_infos = _solver->detect(shape1, shape2);
         result.push_back(col_infos);
     }
@@ -211,27 +211,6 @@ void PhysicsManager::processNarrowPhase(CollisionManifoldGroup& colliding, const
     auto col_infos = detectCollisions(colliding, col_list);
     solveOverlaps(colliding, col_infos, col_list);
     processReactions(colliding, col_infos, col_list);
-    //     for(auto col_info : col_infos) {
-    //         if(!col_info.detected) {
-    //             continue;
-    //         }
-    //
-    //         //ci->first.collider->notify({*ci->first.collider, *ci->second.collider, col_info});
-    //         col_info.cn *= -1.f;
-    //         //ci->second.collider->notify({*ci->second.collider, *ci->first.collider, col_info});
-    //         col_info.cn *= -1.f;
-    //
-    //         if(ci->first.collider->isTrigger || ci->second.collider->isTrigger) {
-    //             continue;
-    //         }
-    //         float restitution = selectFrom(ci->first.material->restitution, ci->second.material->restitution, bounciness_select);
-    //         float sfriction = selectFrom(ci->first.material->sfriction, ci->second.material->sfriction, friction_select);
-    //         float dfriction = selectFrom(ci->first.material->dfriction, ci->second.material->dfriction, friction_select);
-    //         _solver->solve(col_info, ci->first, ci->second, restitution, sfriction, dfriction);
-    //         // if(!ci->first.rigidbody->isStatic && !ci->second.rigidbody->isStatic)
-    //         //     Merge(ci->first.collider, ci->second.collider);
-    //     }
-    // }
 }
 // void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
 //     if(man.collider->isTrigger)
@@ -374,7 +353,7 @@ void PhysicsManager::integrate( float delT, CollisionManifoldGroup& group) const
     integrateAny          (delT, group.slice<Rigidbody::Velocity, Transform::Position>           ());
     integrateAny          (delT, group.slice<Rigidbody::AngularVelocity, Transform::Rotation>    ());
     for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
-        vel.y += delT * 100.f;
+        vel.y += delT * 1000.f;
     }
 }
 
@@ -383,22 +362,33 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
             float delT) const 
 {
     float deltaStep = delT / (float)steps;
-    auto colliding_objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
+    auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
     
-    auto potential_col_list = processBroadPhase(colliding_objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
-    auto col_list = filterBroadPhaseResults(colliding_objects, potential_col_list);
+    // resetNonMovingObjects( colliding_objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
+    //                             Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
     
-    resetNonMovingObjects( colliding_objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
-                                Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
-    
-    for(int i = 0; i < steps; i++) {
-        integrate(deltaStep, colliding_objects);
+    for(int i = 0; i < 1; i++) {
+        integrate(deltaStep, objects);
         // updateRestraints(deltaStep);
         // updateRigidbodies(deltaStep);
-        // processNarrowPhase(col_list);
+        // for(auto [global_trans, local_trans] : objects.slice<Transform::GlobalTransform, Transform::LocalTransform>()) {
+        //     global_trans.combine(local_trans.getInverse());
+        // }
+        // 
+        // Transform::updateLocalTransforms(objects.slice<Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform>());
+        // 
+        // for(auto [global_trans, local_trans] : objects.slice<Transform::GlobalTransform, Transform::LocalTransform>()) {
+        //     global_trans.combine(local_trans);
+        // }
+        // 
+        // Collider::updateCollisionShapes(objects.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(),
+        //         objects.slice<Transform::GlobalTransform>());
+        auto potential_col_list = processBroadPhase(objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
+        auto col_list = filterBroadPhaseResults(objects, potential_col_list);
+        processNarrowPhase(objects, col_list);
     }
-    copyResultingTransforms(colliding_objects.sliceOwner<Transform::Position, Transform::Rotation>(), trans_sys);
-    copyResultingVelocities(colliding_objects.sliceOwner<Rigidbody::Velocity, Rigidbody::AngularVelocity>(), rb_sys);
+    copyResultingTransforms(objects.sliceOwner<Transform::Position, Transform::Rotation>(), trans_sys);
+    copyResultingVelocities(objects.sliceOwner<Rigidbody::Velocity, Rigidbody::AngularVelocity>(), rb_sys);
     // processSleeping();
 }
 

@@ -97,14 +97,20 @@ int main() {
     Entity green;
     Entity blue;
     
+    std::vector<vec2f> model_red = {vec2f(100.f, 100.f), vec2f(100.f, -100.f), vec2f(-100.f, -100.f), vec2f(-150.f, 0.f), vec2f(-100.f, 100.f)};
+    std::vector<vec2f> model_green = {vec2f(0.f, 60.f), vec2f(78.f, -30.f), vec2f(-78.f, -30.f)};
+    
     sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{45.f}, Parent{sys.world}, sf::Color::Red);
     sys.rb_sys.push_back(red, {false}, {false}, {vec2f()}, {vec2f()}, {0.f}, {0.f}, {1.f});
     sys.mat_sys.push_back(red, {0.f}, {0.f}, {0.f}, {0.1f});
-    std::vector<vec2f> model = {vec2f(10.f, 10.f), vec2f(10.f, -10.f), vec2f(-10.f, -10.f), vec2f(-15.f, 0.f), vec2f(-10.f, 10.f)};
-    sys.col_sys.push_back(red, model);
+    sys.col_sys.push_back(red, model_red);
     sys.add(magenta, "magenta", Position{{100.f, 100.f}}, Rotation{},     Parent{red},       sf::Color::Magenta);
     sys.add(yellow,  "yellow",  Position{{10.f,  0.f}},   Rotation{},     Parent{magenta},   sf::Color::Yellow);
     sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green);
+    sys.rb_sys.push_back( green, {false}, {false}, {vec2f()}, {vec2f()}, {0.f}, {0.f}, {1.f});
+    sys.mat_sys.push_back(green, {0.f}, {0.f}, {0.f}, {0.1f});
+    sys.col_sys.push_back(green, model_green);
+    
     sys.add(blue,    "blue",    Position{{600.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Blue);
 
     auto info = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());

@@ -27,7 +27,7 @@ std::vector<std::vector<vec2f>> triangulateEarClipping(const std::vector<vec2f>&
             if (containsVertex) {
                 continue;
             }
-            result.push_back({first, mid, last});
+            result.push_back({last, mid, first});
             tmp.erase(tmp.begin() + mid_index);
             break;
         }
@@ -125,6 +125,103 @@ static bool isConvex(vec2f p1, vec2f p2, vec2f p3) {
     } else {
         return 0;
     }
+}
+
+static std::vector<ConvexPolygon>
+partitionConvexHertelMehlhornPoly(std::vector<ConvexPolygon> triangles) {
+
+    vec2f d1, d2, p1, p2, p3;
+    bool isdiagonal;
+    long i11, i12, i21, i22, i13, i23, j, k;
+    for (auto iter1 = triangles.begin(); iter1 != triangles.end(); iter1++) {
+        auto poly1 = &(*iter1);
+        decltype(poly1) poly2;
+        decltype(iter1) iter2;
+
+        for (i11 = 0; i11 < poly1->getVertecies().size(); i11++) {
+            auto d1 = poly1->getVertecies()[i11];
+            i12 = (i11 + 1) % (poly1->getVertecies().size());
+            d2 = poly1->getVertecies()[i12];
+            isdiagonal = false;
+            for (iter2 = iter1; iter2 != triangles.end(); iter2++) {
+                if (iter1 == iter2) {
+                    continue;
+                }
+                poly2 = &(*iter2);
+
+                for (i21 = 0; i21 < poly2->getVertecies().size(); i21++) {
+                    if ((d2.x != poly2->getVertecies()[i21].x) ||
+                        (d2.y != poly2->getVertecies()[i21].y)) {
+                        continue;
+                    }
+                    i22 = (i21 + 1) % (poly2->getVertecies().size());
+                    if ((d1.x != poly2->getVertecies()[i22].x) ||
+                        (d1.y != poly2->getVertecies()[i22].y)) {
+                        continue;
+                    }
+                    isdiagonal = true;
+                    break;
+                }
+                if (isdiagonal) {
+                    break;
+                }
+            }
+            if (!isdiagonal) {
+                continue;
+            }
+
+            p2 = poly1->getVertecies()[i11];
+            if (i11 == 0) {
+                i13 = poly1->getVertecies().size() - 1;
+            } else {
+                i13 = i11 - 1;
+            }
+            p1 = poly1->getVertecies()[i13];
+            if (i22 == (poly2->getVertecies().size() - 1)) {
+                i23 = 0;
+            } else {
+                i23 = i22 + 1;
+            }
+            p3 = poly2->getVertecies()[i23];
+
+            if (!isConvex(p1, p2, p3)) {
+                continue;
+            }
+
+            p2 = poly1->getVertecies()[i12];
+            if (i12 == (poly1->getVertecies().size() - 1)) {
+                i13 = 0;
+            } else {
+                i13 = i12 + 1;
+            }
+            p3 = poly1->getVertecies()[i13];
+            if (i21 == 0) {
+                i23 = poly2->getVertecies().size() - 1;
+            } else {
+                i23 = i21 - 1;
+            }
+            p1 = poly2->getVertecies()[i23];
+
+            if (!isConvex(p1, p2, p3)) {
+                continue;
+            }
+
+            std::vector<vec2f> newpoly;
+            for (j = i12; j != i11;
+                 j = (j + 1) % (poly1->getVertecies().size())) {
+                newpoly.push_back(poly1->getVertecies()[j]);
+            }
+            for (j = i22; j != i21;
+                 j = (j + 1) % (poly2->getVertecies().size())) {
+                newpoly.push_back(poly2->getVertecies()[j]);
+            }
+            triangles.erase(iter2);
+            *iter1 = ConvexPolygon::CreateFromPoints(newpoly);
+            poly1 = &(*iter1);
+            i11 = -1;
+        }
+    }
+    return triangles;
 }
 static std::vector<std::vector<vec2f>>
 partitionConvexHertelMehlhorn(std::vector<std::vector<vec2f>> result) {
