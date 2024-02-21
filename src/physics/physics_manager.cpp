@@ -134,7 +134,11 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Collisi
         const auto& shape1 = (*group.cget<Collider::ShapeTransformedPartitioned>(entity1).value());
         const auto& shape2 = (*group.cget<Collider::ShapeTransformedPartitioned>(entity2).value());
         auto col_infos = _solver->detect(shape1, shape2);
-        result.push_back(col_infos);
+        result.push_back({});
+        for(auto info : col_infos) {
+            if(info.detected)
+                result.back().push_back(info);
+        }
     }
     return result;
 }
@@ -149,8 +153,6 @@ void PhysicsManager::solveOverlaps(CollisionManifoldGroup& group, const std::vec
         auto& pos2 = *group.get<Transform::Position>(entity2).value();
         auto& rot2 = *group.get<Transform::Rotation>(entity2).value();
         for(const auto& info : col_info[i]) {
-            if(!info.detected)
-                continue;
             _solver->solveOverlap(info, isStatic1, pos1, rot1, isStatic2, pos2, rot2);
         }
     }
@@ -188,19 +190,18 @@ void PhysicsManager::processReactions(CollisionManifoldGroup& group, const std::
         size_t ii = 1;
         for(auto e : {entity1, entity2}) {
             tmp[ii].mass = *group.cget<Rigidbody::Mass>(e).value();
-            tmp[ii].inv_inertia = *group.cget<Collider::InertiaDevMass>(e).value();
+            tmp[ii].inv_inertia = 1.f / (*group.cget<Collider::InertiaDevMass>(e).value() * tmp[ii].mass);
             tmp[ii].vel = group.get<Rigidbody::Velocity>(e).value();
             float& f = (*group.get<Rigidbody::AngularVelocity>(e).value());
             tmp[ii].ang_vel = &f;
             ii++;
         }
         for(const auto& info : col_info[i]) {
-            if(!info.detected)
-                continue;
             vec2f rad1, rad2;
             auto cp = std::reduce(info.cps.begin(), info.cps.end()) / (float)info.cps.size();
             rad1 = cp - *group.get<Transform::Position>(entity1).value();
             rad2 = cp - *group.get<Transform::Position>(entity2).value();
+            
             _solver->processReaction(info, sfric, dfric, bounce, 
                     tmp[1].inv_inertia, tmp[1].mass, rad1, *tmp[1].vel, *tmp[1].ang_vel, 
                     tmp[2].inv_inertia, tmp[2].mass, rad2, *tmp[2].vel, *tmp[2].ang_vel);
@@ -285,6 +286,7 @@ PhysicsManager::CollisionManifoldGroup PhysicsManager::createCollidingObjectsGro
     updateSystem(col_sys);
     return colliding_objects;
 }
+
 void PhysicsManager::resetNonMovingObjects(
     Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force, Rigidbody::AngularForce,
           Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>
@@ -303,6 +305,7 @@ void PhysicsManager::resetNonMovingObjects(
         }
     }
 }
+
 void PhysicsManager::copyResultingVelocities(
     Slice<Entity, Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice,
     Rigidbody::System& rb_sys) const 
@@ -353,8 +356,16 @@ void PhysicsManager::integrate( float delT, CollisionManifoldGroup& group) const
     integrateAny          (delT, group.slice<Rigidbody::Velocity, Transform::Position>           ());
     integrateAny          (delT, group.slice<Rigidbody::AngularVelocity, Transform::Rotation>    ());
     for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
-        vel.y += delT * 1000.f;
+        vel.y += delT * 500.f;
     }
+}
+void PhysicsManager::rollbackGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const {
+    for(auto [g, l] : slice)
+        g.combine(l.getInverse());
+}
+void PhysicsManager::updateGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const {
+    for(auto [g, l] : slice)
+        g.combine(l);
 }
 
 void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
@@ -367,24 +378,19 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     // resetNonMovingObjects( colliding_objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
     //                             Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
     
-    for(int i = 0; i < 1; i++) {
+    for(int i = 0; i < steps; i++) {
         integrate(deltaStep, objects);
-        // updateRestraints(deltaStep);
-        // updateRigidbodies(deltaStep);
-        // for(auto [global_trans, local_trans] : objects.slice<Transform::GlobalTransform, Transform::LocalTransform>()) {
-        //     global_trans.combine(local_trans.getInverse());
-        // }
-        // 
-        // Transform::updateLocalTransforms(objects.slice<Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform>());
-        // 
-        // for(auto [global_trans, local_trans] : objects.slice<Transform::GlobalTransform, Transform::LocalTransform>()) {
-        //     global_trans.combine(local_trans);
-        // }
-        // 
-        // Collider::updateCollisionShapes(objects.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(),
-        //         objects.slice<Transform::GlobalTransform>());
+        
+        rollbackGlobalTransform(objects.slice<Transform::GlobalTransform, Transform::LocalTransform>());
+        Transform::updateLocalTransforms(objects.slice<Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform>());
+        updateGlobalTransform(objects.slice<Transform::GlobalTransform, Transform::LocalTransform>());
+        
+        Collider::updateCollisionShapes(objects.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(),
+                objects.slice<Transform::GlobalTransform>());
+        
         auto potential_col_list = processBroadPhase(objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
         auto col_list = filterBroadPhaseResults(objects, potential_col_list);
+        
         processNarrowPhase(objects, col_list);
     }
     copyResultingTransforms(objects.sliceOwner<Transform::Position, Transform::Rotation>(), trans_sys);

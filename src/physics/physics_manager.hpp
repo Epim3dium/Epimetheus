@@ -75,6 +75,9 @@ private:
     void applyAngularVelocityDrag(float delT, Slice<Rigidbody::AngularVelocity, Material::AirDrag> slice) const;
 
     void integrate(float delT, CollisionManifoldGroup& group) const;
+    
+    void rollbackGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const;
+    void updateGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const;
 
 public :
     // number of physics/collision steps per frame

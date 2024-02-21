@@ -114,9 +114,6 @@ int main() {
     sys.add(blue,    "blue",    Position{{600.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Blue);
 
     auto info = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
-    for(auto i : info.second) {
-        std::cerr << i << "\n";
-    }
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(1000, 1000), "My window");
@@ -162,6 +159,7 @@ int main() {
             cs.setFillColor(sys.color_table[ids[i]]);
             window.draw(cs);
         }
+        auto vel = sys.rb_sys.get<Rigidbody::Velocity>(red);
         Collider::updateCollisionShapes(sys.col_sys.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(), sys.transforms.slice<Transform::GlobalTransform>());
         for(auto [shape] : sys.col_sys.slice<Collider::ShapeTransformedPartitioned>()) {
             sf::Vertex vert[2];
@@ -203,6 +201,7 @@ int main() {
                 if (selected != name) {
                     continue;
                 }
+                *sys.rb_sys.get<Rigidbody::Velocity>(e).value() = vec2f(0.f, 0.f);
                 ImGui::BeginChild(("tab " + name).c_str());
                 ImGui::Text("%s", (name + " settings:").c_str());
                 auto& ref_pos =
