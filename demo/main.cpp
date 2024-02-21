@@ -199,9 +199,11 @@ int main() {
             }
             for (auto [e, name] : sys.name_table) {
                 if (selected != name) {
+                    if(sys.rb_sys.get<Rigidbody::isStaticFlag>(e).has_value())
+                        *sys.rb_sys.get<Rigidbody::isStaticFlag>(e).value() = false;
                     continue;
                 }
-                *sys.rb_sys.get<Rigidbody::Velocity>(e).value() = vec2f(0.f, 0.f);
+                *sys.rb_sys.get<Rigidbody::isStaticFlag>(e).value() = true;
                 ImGui::BeginChild(("tab " + name).c_str());
                 ImGui::Text("%s", (name + " settings:").c_str());
                 auto& ref_pos =

@@ -60,9 +60,10 @@ private:
     CollisionManifoldGroup createCollidingObjectsGroup(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                                                        Collider::System& col_sys, Material::System& mat_sys) const;
     template<class IntegratorT, class IntegrateeT>
-    void integrateAny(float delT, Slice<IntegratorT, IntegrateeT> slice) const {
-        for(auto [a, b] : slice) {
-            b += a * delT;
+    void integrateAny(float delT, Slice<Rigidbody::isStaticFlag, IntegratorT, IntegrateeT> slice) const {
+        for(auto [isStatic, a, b] : slice) {
+            if(!isStatic)
+                b += a * delT;
         }
     }
     // void integrateForce          (float delT, Slice<Rigidbody::Force, Rigidbody::Velocity> slice) const;

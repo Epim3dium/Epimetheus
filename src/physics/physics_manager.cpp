@@ -347,14 +347,14 @@ void PhysicsManager::applyAngularVelocityDrag(float delT, Slice<Rigidbody::Angul
     }
 }
 void PhysicsManager::integrate( float delT, CollisionManifoldGroup& group) const {
-    integrateAny          (delT, group.slice<Rigidbody::Force, Rigidbody::Velocity>              ());
-    integrateAny          (delT, group.slice<Rigidbody::AngularForce, Rigidbody::AngularVelocity>());
+    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::Force, Rigidbody::Velocity>              ());
+    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::AngularForce, Rigidbody::AngularVelocity>());
 
     applyVelocityDrag       (delT, group.slice<Rigidbody::Velocity, Material::AirDrag>             ());
     applyAngularVelocityDrag(delT, group.slice<Rigidbody::AngularVelocity, Material::AirDrag>      ());
     
-    integrateAny          (delT, group.slice<Rigidbody::Velocity, Transform::Position>           ());
-    integrateAny          (delT, group.slice<Rigidbody::AngularVelocity, Transform::Rotation>    ());
+    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::Velocity, Transform::Position>           ());
+    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::AngularVelocity, Transform::Rotation>    ());
     for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
         vel.y += delT * 500.f;
     }
@@ -375,8 +375,8 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     float deltaStep = delT / (float)steps;
     auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
     
-    // resetNonMovingObjects( colliding_objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
-    //                             Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
+    resetNonMovingObjects( objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
+                                Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
     
     for(int i = 0; i < steps; i++) {
         integrate(deltaStep, objects);
