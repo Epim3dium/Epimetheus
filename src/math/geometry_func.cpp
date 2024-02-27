@@ -539,7 +539,7 @@ std::vector<vec2f> findContactPoints(const ConvexPolygon& p0, const ConvexPolygo
                     return s1.segID == a.segID;
             });
             if(itr == open[a.polyID].end()) {
-                //std::cerr << "tried to find a line segment that is not present";
+                std::cerr << "tried to find a line segment that is not present";
                 continue;
             }
             open[a.polyID].erase(itr);

@@ -29,15 +29,6 @@ using Hierarchy::Parent;
 
 typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
     TransformGroup;
-void updateLocalTransforms(
-    Slice<Entity, Position, Rotation, Scale, LocalTransform> slice) {
-    for (auto [e, pos, rot, scale, trans] : slice) {
-        trans = {sf::Transform::Identity};
-        trans.translate(pos);
-        trans.rotate(rot);
-        trans.scale(scale);
-    }
-}
 void updateParentTransformByHierarchy(
     Slice<Entity, LocalTransform, GlobalTransform> slice,
     const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) {
@@ -100,7 +91,7 @@ int main() {
     std::vector<vec2f> model_red = {vec2f(100.f, 100.f), vec2f(100.f, -100.f), vec2f(-100.f, -100.f), vec2f(-150.f, 0.f), vec2f(-100.f, 100.f)};
     std::vector<vec2f> model_green = {vec2f(0.f, 60.f), vec2f(78.f, -30.f), vec2f(-78.f, -30.f)};
     
-    sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{45.f}, Parent{sys.world}, sf::Color::Red);
+    sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{0.f}, Parent{sys.world}, sf::Color::Red);
     sys.rb_sys.push_back(red, {false}, {false}, {vec2f()}, {vec2f()}, {0.f}, {0.f}, {1.f});
     sys.mat_sys.push_back(red, {0.f}, {0.f}, {0.f}, {0.1f});
     sys.col_sys.push_back(red, model_red);
@@ -137,8 +128,7 @@ int main() {
 
         // clear the window with black color
         window.clear(sf::Color::Black);
-        updateLocalTransforms(
-            sys.transforms.sliceOwner<Position, Rotation, Scale, LocalTransform>());
+        Transform::updateLocalTransforms(sys.transforms.slice<Position, Rotation, Scale, LocalTransform>());
         updateParentTransformByHierarchy(
             sys.transforms.sliceOwner<LocalTransform, GlobalTransform>(),
             sys.hierarchy, info);

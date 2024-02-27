@@ -7,7 +7,7 @@ void updateLocalTransforms(
     for (auto [pos, rot, scale, trans] : slice) {
         trans = {sf::Transform::Identity};
         trans.translate(pos);
-        trans.rotate(rot);
+        trans.rotate(rot / M_PI * 180.f);
         trans.scale(scale);
     }
 }
