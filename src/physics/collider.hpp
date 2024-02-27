@@ -47,7 +47,6 @@ EPI_WRAP_TYPE(epi::Set<std::string>, Mask);
 
 //funtions used
 std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const sf::Transform& transform);
-AABB calcAABB(const std::vector<vec2f>& model_points, const sf::Transform& transform);
 float calcInertiaDevMass(const std::vector<std::vector<vec2f>>& model_points);
 
 //system
