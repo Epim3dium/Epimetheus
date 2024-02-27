@@ -6,6 +6,7 @@
 
 namespace epi {
     
+bool isTriangulable(const std::vector<vec2f>& points);
 std::vector<std::vector<vec2f>> triangulate(const std::vector<vec2f>& points);
 std::vector<std::vector<vec2f>> partitionConvex(const std::vector<std::vector<vec2f>>& polygons);
 

@@ -1,6 +1,33 @@
 #include "geometry_func.hpp"
 #include "math/math_func.hpp"
 namespace epi {
+bool isTriangulable(const std::vector<vec2f>& points) {
+    for (int i = 0; i < points.size(); i++) {
+        auto first = points[i];
+        auto mid_index = (i + 1) % points.size();
+        auto mid = points[mid_index];
+        auto last = points[(i + 2) % points.size()];
+        float angle = angleAround(first, mid, last);
+        if (angle < 0.f) {
+            continue;
+        }
+        bool containsVertex = false;
+        for (auto p : points) {
+            if (p == first || p == mid || p == last)
+                continue;
+            if (isOverlappingPointPoly(p, {first, mid, last})) {
+                containsVertex = true;
+                break;
+            }
+        }
+        if (containsVertex) {
+            continue;
+        }
+        return true;
+    }
+    return false;
+}
+
 std::vector<std::vector<vec2f>> triangulateEarClipping(const std::vector<vec2f>& points) {
     std::vector<std::vector<vec2f>> result;
     std::vector<vec2f> tmp = points;
@@ -32,6 +59,7 @@ std::vector<std::vector<vec2f>> triangulateEarClipping(const std::vector<vec2f>&
             break;
         }
         if (res_size_last == result.size()) {
+            std::cerr << "flagged";
             break;
         }
     }

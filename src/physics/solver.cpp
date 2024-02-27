@@ -27,29 +27,9 @@ CollisionInfo detectOverlap(const ConvexPolygon& p1, const ConvexPolygon& p2) {
 void DefaultSolver::processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
         float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
         float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) {
-    //isstatic, lockrotation, mass, velocity, angluarvelocity, globaltransform
-    //|
-    //V
-    //inv_inertia, mass, rad, vel, ang_vel 
-
-    // auto& rb1 = *m1.rigidbody;
-    // auto& rb2 = *m2.rigidbody;
-    //
-    // float mass1 = rb1.isStatic ? INFINITY : rb1.mass;
-    // float mass2 = rb2.isStatic ? INFINITY : rb2.mass;
-    // float inv_inertia1 = 1.f / ((rb1.isStatic || rb1.lockRotation) ? INFINITY : m1.collider->getInertia(rb1.mass));
-    // float inv_inertia2 = 1.f / ((rb2.isStatic || rb2.lockRotation) ? INFINITY : m2.collider->getInertia(rb2.mass));
-    // vec2f vel1 = rb1.velocity;
-    // vec2f vel2 = rb2.velocity;
-    // float ang_vel1 = rb1.angular_velocity;
-    // float ang_vel2 = rb2.angular_velocity;
-
 
     auto cp = std::reduce(info.cps.begin(), info.cps.end()) / (float)info.cps.size();
     vec2f impulse (0, 0);
-
-    // vec2f rad1 = cp - m1.transform->getPos();
-    // vec2f rad2 = cp - m2.transform->getPos();
 
     vec2f rad1perp(-rad1.y, rad1.x);
     vec2f rad2perp(-rad2.y, rad2.x);
@@ -95,8 +75,7 @@ vec2f DefaultSolver::getFricImpulse(float p1inv_inertia, float mass1, vec2f rad1
 
     if(length(tangent) < 0.01f)
         return vec2f(0, 0);
-    else
-        tangent = normal(tangent);
+    tangent = normal(tangent);
 
     //equation from net
     float r1perp_dotT = dot(rad1perp, tangent);

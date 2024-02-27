@@ -84,12 +84,6 @@ public :
     // number of physics/collision steps per frame
     size_t steps = 8;
 
-    /*
-     * updates all rigidbodies bound applying their velocities and resoving
-     * collisions
-     * @param pm is particle manager, if bound collisions for all active
-     * particles will be resolved(colliding particles will become inactive)
-     */
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
                 float delT) const;

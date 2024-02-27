@@ -4,6 +4,9 @@ namespace epi {
 namespace Collider {
 std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const sf::Transform& transform) {
     auto transformed_points = Transform::transformPoints(model_points, transform);
+    if(!isTriangulable(transformed_points))
+        std::reverse(transformed_points.begin(), transformed_points.end());
+    assert(isTriangulable(transformed_points));
     auto triangles = triangulate(transformed_points);
     auto convex_polygons = partitionConvex(triangles);
     return convex_polygons;

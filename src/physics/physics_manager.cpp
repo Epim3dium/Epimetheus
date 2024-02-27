@@ -206,7 +206,7 @@ void PhysicsManager::processReactions(CollisionManifoldGroup& group, const std::
             rad1 = cp - *group.get<Transform::Position>(entity1).value();
             rad2 = cp - *group.get<Transform::Position>(entity2).value();
             
-            _solver->processReaction(info, sfric, 0.4f, bounce, 
+            _solver->processReaction(info, sfric, dfric, bounce, 
                     tmp[1].inv_inertia, tmp[1].mass, rad1, *tmp[1].vel, *tmp[1].ang_vel, 
                     tmp[2].inv_inertia, tmp[2].mass, rad2, *tmp[2].vel, *tmp[2].ang_vel);
         }
