@@ -52,6 +52,9 @@ public:
     typename iterator::reference operator[](size_t index) {
         return *(std::next(this->begin(), index));
     }
+    bool contains(Entity e) const {
+        return m_entityToIndex.contains(e);
+    }
     // typename iterator::const_reference operator[](size_t index) const {
     //     return *(begin() + index);
     // }
@@ -106,6 +109,8 @@ public:
             }, m_data_spans); 
     }
 };
+template<class ...Types>
+struct OwnerSlice : Slice<Entity, Types...> {};
 
 }
 #endif

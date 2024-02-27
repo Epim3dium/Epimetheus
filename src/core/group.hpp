@@ -190,12 +190,12 @@ public:
     {
         return Slice<Types...>(m_entityToIndex, std::get<std::vector<Types>>(m_data)...);
     }
-    Slice<Entity, Types...> sliceAllOwner() 
+    OwnerSlice<Types...> sliceAllOwner() 
     {
         return Slice<Entity, Types...>(m_entityToIndex, m_entity_ids, std::get<std::vector<Types>>(m_data)...);
     }
     template<class ...ExtractedTy>
-    Slice<Entity, ExtractedTy...> sliceOwner() 
+    OwnerSlice<ExtractedTy...> sliceOwner() 
     {
         return Slice<Entity, ExtractedTy...>(m_entityToIndex, m_entity_ids, std::get<std::vector<ExtractedTy>>(m_data)...);
     }
