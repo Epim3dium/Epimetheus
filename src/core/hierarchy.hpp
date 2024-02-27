@@ -12,7 +12,7 @@ EPI_WRAP_TYPE(std::vector<Entity>, Children);
 
 typedef Group<Parent, Children> System;
 //returns pair : max_depth, BFS_path
-std::pair<int, std::vector<size_t> > getBFSIndexList(Slice<Entity, Parent> slice);
+std::pair<int, std::vector<size_t> > getBFSIndexList(OwnerSlice<Parent> slice);
 
 }
 }

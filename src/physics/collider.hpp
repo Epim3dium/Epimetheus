@@ -79,7 +79,7 @@ public:
     }
     System() {}
 };
-void updateCollisionShapes(Slice<Entity, ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice);
+void updateCollisionShapes(OwnerSlice<ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice);
 
 };
 

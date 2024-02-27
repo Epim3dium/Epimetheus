@@ -3,7 +3,7 @@
 namespace epi {
 namespace Hierarchy {
     
-std::pair<int, std::vector<size_t> > getBFSIndexList(Slice<Entity, Parent> slice) {
+std::pair<int, std::vector<size_t> > getBFSIndexList(OwnerSlice<Parent> slice) {
     std::vector<size_t> path;
     int max_depth = -1;
     

@@ -20,7 +20,7 @@ float calcInertiaDevMass(const std::vector<std::vector<vec2f>>& model_points) {
     }
     return result;
 }
-void updateCollisionShapes(Slice<Entity, ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice) {
+void updateCollisionShapes(OwnerSlice<ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice) {
     for(auto [owner, model, result] : shape_slice) {
         auto transform_maybe = transform_slice.get<Transform::GlobalTransform>(owner);
         assert(transform_maybe.has_value());

@@ -59,7 +59,7 @@ static bool areCompatible(const Collider::Mask& mask1, const Collider::Tag& tag1
         (mask1.size() == 0 || tag2 ^ mask1);
 }
 std::vector<PhysicsManager::ColParticipants> PhysicsManager::processBroadPhase(
-    Slice<Entity, Collider::ShapeTransformedPartitioned> slice) const 
+    OwnerSlice<Collider::ShapeTransformedPartitioned> slice) const 
 {
     std::vector<PhysicsManager::ColParticipants> result;
     struct SwipeeInformation {
@@ -311,7 +311,7 @@ void PhysicsManager::resetNonMovingObjects(
 }
 
 void PhysicsManager::copyResultingVelocities(
-    Slice<Entity, Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice,
+    OwnerSlice<Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice,
     Rigidbody::System& rb_sys) const 
 {
     for(auto [owner, vel, ang_vel] : result_slice) {
@@ -327,7 +327,7 @@ void PhysicsManager::copyResultingVelocities(
         ang_force = 0.f;
     }
 }
-void PhysicsManager::copyResultingTransforms(Slice<Entity, Transform::Position, Transform::Rotation> result_slice,
+void PhysicsManager::copyResultingTransforms(OwnerSlice<Transform::Position, Transform::Rotation> result_slice,
                                              Transform::System& trans_sys) const {
     for(auto [owner, pos, rot] : result_slice) {
         //removed when processing collisions

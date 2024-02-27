@@ -110,7 +110,11 @@ public:
     }
 };
 template<class ...Types>
-struct OwnerSlice : Slice<Entity, Types...> {};
+struct OwnerSlice : Slice<Entity, Types...> {
+    
+    OwnerSlice(const std::unordered_map<Entity, size_t>& entityToIndexMap, std::vector<Entity>& owner, std::vector<Types>& ...vectors)
+        : Slice<Entity, Types...>(entityToIndexMap, owner, vectors...) {}
+};
 
 }
 #endif

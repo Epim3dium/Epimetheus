@@ -30,7 +30,7 @@ using Hierarchy::Parent;
 typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
     TransformGroup;
 void updateParentTransformByHierarchy(
-    Slice<Entity, LocalTransform, GlobalTransform> slice,
+    OwnerSlice<LocalTransform, GlobalTransform> slice,
     const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) {
     size_t to_update = 0;
     int iter = 0;

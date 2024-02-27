@@ -42,7 +42,7 @@ private:
     std::unique_ptr<SolverInterface> _solver =
         std::make_unique<DefaultSolver>();
 
-    std::vector<ColParticipants> processBroadPhase(Slice<Entity, Collider::ShapeTransformedPartitioned> slice) const;
+    std::vector<ColParticipants> processBroadPhase(OwnerSlice<Collider::ShapeTransformedPartitioned> slice) const;
     std::vector<ColParticipants> filterBroadPhaseResults(const CollisionManifoldGroup& group, const std::vector<ColParticipants> broad_result) const;
     
     std::vector<std::vector<CollisionInfo>> detectCollisions(CollisionManifoldGroup& group, const std::vector<ColParticipants>& col_list) const;
@@ -53,8 +53,8 @@ private:
     
     void resetNonMovingObjects(Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
          Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag> slice) const;
-    void copyResultingVelocities(Slice<Entity, Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
-    void copyResultingTransforms(Slice<Entity, Transform::Position, Transform::Rotation> result_slice, Transform::System& trans_sys) const; 
+    void copyResultingVelocities(OwnerSlice<Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
+    void copyResultingTransforms(OwnerSlice<Transform::Position, Transform::Rotation> result_slice, Transform::System& trans_sys) const; 
 
     //group contains only objects that can collide and react to collisions
     CollisionManifoldGroup createCollidingObjectsGroup(Transform::System& trans_sys, Rigidbody::System& rb_sys,
