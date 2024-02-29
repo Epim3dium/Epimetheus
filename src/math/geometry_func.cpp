@@ -587,47 +587,61 @@ float area(const std::vector<vec2f>& model) {
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const ConvexPolygon &r1, const ConvexPolygon &r2) {
     const ConvexPolygon *poly1 = &r1;
     const ConvexPolygon *poly2 = &r2;
+    std::vector<vec2f> verticies[2] = {poly1->getVertecies(), poly2->getVertecies()};
+    vec2f centers[2] = {poly1->getPos(), poly2->getPos()};
 
     float overlap = INFINITY;
     vec2f cn;
+    vec2f cp;
     
-    for (int shape = 0; shape < 2; shape++) {
-        if (shape == 1) {
-            poly1 = &r2;
-            poly2 = &r1;
-        }
-        for (int a = 0; a < poly1->getVertecies().size(); a++) {
-            int b = (a + 1) % poly1->getVertecies().size();
-            vec2f axisProj = { -(poly1->getVertecies()[b].y - poly1->getVertecies()[a].y), poly1->getVertecies()[b].x - poly1->getVertecies()[a].x };
+    for (int poly1 = 0; poly1 < 2; poly1++) {
+        auto poly2 = !poly1;
+        
+        auto prev = verticies[poly1].back();
+        for (auto vert : verticies[poly1]) {
+            vec2f perp = vert - prev;
+            vec2f axisProj = { -perp.y, perp.x };
             
             // Optional normalisation of projection axis enhances stability slightly
             float d = sqrtf(axisProj.x * axisProj.x + axisProj.y * axisProj.y);
             axisProj = { axisProj.x / d, axisProj.y / d };
 
             // Work out min and max 1D points for r1
+            float min_dist = INFINITY;
+            vec2f pot_cp;
             float min_r1 = INFINITY, max_r1 = -INFINITY;
-            for (int p = 0; p < poly1->getVertecies().size(); p++) {
-                float q = (poly1->getVertecies()[p].x * axisProj.x + poly1->getVertecies()[p].y * axisProj.y);
+            for (auto p : verticies[poly1]) {
+                float q = dot(p, axisProj);
                 min_r1 = std::min(min_r1, q);
                 max_r1 = std::max(max_r1, q);
             }
 
             // Work out min and max 1D points for r2
             float min_r2 = INFINITY, max_r2 = -INFINITY;
-            for (int p = 0; p < poly2->getVertecies().size(); p++) {
-                float q = (poly2->getVertecies()[p].x * axisProj.x + poly2->getVertecies()[p].y * axisProj.y);
+            for (auto p : verticies[poly2]) {
+                float q = dot(p, axisProj);
+                auto closest = findClosestPointOnRay(prev, perp, p);
+                auto l = qlen(closest - p);
+                if(l < min_dist) {
+                    pot_cp = p;
+                    min_dist = l;
+                }
                 min_r2 = std::min(min_r2, q);
                 max_r2 = std::max(max_r2, q);
             }
 
             // Calculate actual overlap along projected axis, and store the minimum
-            if(std::min(max_r1, max_r2) - std::max(min_r1, min_r2) < overlap) {
-                overlap = std::min(max_r1, max_r2) - std::max(min_r1, min_r2);
+            auto minmax = std::min(max_r1, max_r2);
+            auto maxmin = std::max(min_r1, min_r2); 
+            if(minmax - maxmin < overlap) {
+                overlap = minmax - maxmin;
                 cn = axisProj;
+                cp = pot_cp;
             }
 
             if (!(max_r2 >= min_r1 && max_r1 >= min_r2))
                 return {false};
+            prev = vert;
         }
     }
     //correcting normal
@@ -635,7 +649,7 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const ConvexPolygon &r1
     if(d > 0.f)
         cn *= -1.f;
 
-    return {true, cn, overlap};
+    return {true, cn, overlap, cp};
 }
 IntersectionPolygonCircleResult intersectCirclePolygon(const Circle &c, const ConvexPolygon &r) {
     vec2f max_reach = c.pos + normal(r.getPos() - c.pos) * c.radius;

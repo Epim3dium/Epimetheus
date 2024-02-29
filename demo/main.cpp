@@ -213,7 +213,7 @@ int main() {
                     *sys.transforms.get<Rotation>(e).value();
                 float& f = ref_rotate;
                 ImGui::SliderFloat((name + " rotation").c_str(),
-                                   &f, 0.f, 360.f);
+                                   &f, 0.f, M_PI * 2.f);
                 ImGui::EndChild();
             }
             ImGui::End();

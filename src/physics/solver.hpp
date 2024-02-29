@@ -23,7 +23,7 @@ public:
     //if any object has lockedRotation, then:
     //inv_inertia = 0
     //ang_vel = 0
-    virtual void processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
+    virtual void processReaction(vec2f contact_normal, float sfric, float dfric, float bounce, 
             float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
             float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) = 0;
     
@@ -41,7 +41,7 @@ public:
     void solveOverlap(CollisionInfo info, 
             bool isStatic1, vec2f& pos1, float& rot1, 
             bool isStatic2, vec2f& pos2, float& rot2) override;
-    void processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
+    void processReaction(vec2f contact_normal, float sfric, float dfric, float bounce, 
             float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
             float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) override;
 };

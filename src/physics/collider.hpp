@@ -18,7 +18,7 @@ namespace epi {
 struct CollisionInfo {
     bool detected;
     vec2f cn;
-    std::vector<vec2f> cps;
+    vec2f cp;
     float overlap;
 };
 /*
@@ -77,7 +77,10 @@ public:
         MasterClass::push_back(owner, {model}, {isTrigger},
                 {inertia}, {tags}, {masks}, { ShapeTransformedPartitioned()});
     }
-    System() {}
+    System() {
+        setDefault<isTriggerFlag>({false});
+        setDefault<InertiaDevMass>({1.f});
+    }
 };
 void updateCollisionShapes(OwnerSlice<ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice);
 

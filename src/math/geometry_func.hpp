@@ -102,6 +102,7 @@ struct IntersectionPolygonPolygonResult {
     bool detected;
     vec2f contact_normal;
     float overlap;
+    vec2f cp;
 };
 /**
  * Calculates all information connected to Polygon and Polygon intersection

@@ -16,19 +16,18 @@ namespace epi {
 CollisionInfo detectOverlap(const ConvexPolygon& p1, const ConvexPolygon& p2) {
     auto intersection = intersectPolygonPolygon(p1, p2);
     if(intersection.detected) {
-        std::vector<vec2f> cps;
-        cps = findContactPoints(p1, p2);
-        if(cps.size() ==0)
+        auto cps = findContactPoints(p1, p2);
+        if(cps.size() == 0 )
             return {false};
-        return {true, intersection.contact_normal, cps , intersection.overlap};
+        auto cp = std::reduce(cps.begin(), cps.end()) / static_cast<float>(cps.size());
+        return {true, intersection.contact_normal, cp /* {intersection.cp} */ , intersection.overlap};
     }
     return {false};
 }
-void DefaultSolver::processReaction(CollisionInfo info, float sfric, float dfric, float bounce, 
+void DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bounce, 
         float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
         float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) {
 
-    auto cp = std::reduce(info.cps.begin(), info.cps.end()) / (float)info.cps.size();
     vec2f impulse (0, 0);
 
     vec2f rad1perp(-rad1.y, rad1.x);
@@ -43,11 +42,10 @@ void DefaultSolver::processReaction(CollisionInfo info, float sfric, float dfric
     //calculate relative velocity
     vec2f rel_vel = vel_sum2 - vel_sum1;
 
-    float j = getReactImpulse(rad1perp, inv_inertia1, mass1, rad2perp, inv_inertia2, mass2, bounce, rel_vel, info.cn);
-    vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, info.cn);
-    impulse += info.cn * j - fj;
+    float j = getReactImpulse(rad1perp, inv_inertia1, mass1, rad2perp, inv_inertia2, mass2, bounce, rel_vel, cn);
+    vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
+    impulse += cn * j - fj;
 
-    float cps_ctr = (float)info.cps.size();
     vel1 -= impulse / mass1;
     ang_vel1 += cross(impulse, rad1) * inv_inertia1;
     vel2 += impulse / mass2;
