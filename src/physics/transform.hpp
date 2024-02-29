@@ -12,6 +12,12 @@ EPI_WRAP_TYPE(sf::Transform, LocalTransform);
 EPI_WRAP_TYPE(sf::Transform, GlobalTransform);
 
 struct System : public Group<Position, Rotation, Scale, LocalTransform, GlobalTransform> {
+    System() {
+        setDefault<Rotation>({0.f});
+        setDefault<Scale>({vec2f(1.f, 1.f)});
+        setDefault<LocalTransform>({sf::Transform::Identity});
+        setDefault<GlobalTransform>({sf::Transform::Identity});
+    }
 };
 std::vector<vec2f> transformPoints(std::vector<vec2f> points, const sf::Transform& transform);
 void updateLocalTransforms(

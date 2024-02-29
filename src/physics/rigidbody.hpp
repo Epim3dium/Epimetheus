@@ -24,6 +24,12 @@ EPI_WRAP_TYPE(PrimitiveWrapper<float>, AngularVelocity);
 EPI_WRAP_TYPE(PrimitiveWrapper<float>, Mass);
 
 struct System : public Group<isStaticFlag, lockRotationFlag, Force, Velocity, AngularForce, AngularVelocity, Mass> {
+    System() {
+        setDefault<isStaticFlag>({true});
+        setDefault<lockRotationFlag>({false});
+        setDefault<AngularForce>({0.f});
+        setDefault<Mass>({1.f});
+    }
 };
 /*
 * a class holding all of tha basic rigidbody properties needed to compute collision response
