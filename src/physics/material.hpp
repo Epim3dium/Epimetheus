@@ -9,6 +9,7 @@ EPI_WRAP_TYPE(PrimitiveWrapper<float>, Restitution);
 EPI_WRAP_TYPE(PrimitiveWrapper<float>, StaticFric);
 EPI_WRAP_TYPE(PrimitiveWrapper<float>, DynamicFric);
 EPI_WRAP_TYPE(PrimitiveWrapper<float>, AirDrag);
-typedef Group<Restitution, StaticFric, DynamicFric, AirDrag> System;
+struct System : public Group<Restitution, StaticFric, DynamicFric, AirDrag> {
+};
 };
 }

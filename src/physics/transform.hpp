@@ -11,8 +11,8 @@ EPI_WRAP_TYPE(vec2f, Scale);
 EPI_WRAP_TYPE(sf::Transform, LocalTransform);
 EPI_WRAP_TYPE(sf::Transform, GlobalTransform);
 
-typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
-    System;
+struct System : public Group<Position, Rotation, Scale, LocalTransform, GlobalTransform> {
+};
 std::vector<vec2f> transformPoints(std::vector<vec2f> points, const sf::Transform& transform);
 void updateLocalTransforms(
     Slice<Position, Rotation, Scale, LocalTransform> slice);
