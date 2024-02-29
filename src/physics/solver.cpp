@@ -120,12 +120,12 @@ void DefaultSolver::solveOverlap(CollisionInfo info,
     const float offset = info.overlap * response_coef;
 
     if(isStatic2) {
-        pos1 += info.cn * offset;
+        pos1 += info.contact_normal * offset;
     } else if(isStatic1) {
-        pos2 -= info.cn * offset;
+        pos2 -= info.contact_normal * offset;
     } else {
-        pos1 += info.cn * offset * 0.5f;
-        pos2 -= info.cn * offset * 0.5f;
+        pos1 += info.contact_normal * offset * 0.5f;
+        pos2 -= info.contact_normal * offset * 0.5f;
     }
 }
 // void DefaultSolver::solve(CollisionInfo man, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction)  {

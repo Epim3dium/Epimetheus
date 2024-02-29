@@ -202,10 +202,10 @@ void PhysicsManager::processReactions(CollisionManifoldGroup& group, const std::
         }
         for(const auto& info : col_info[i]) {
             vec2f rad1, rad2;
-            rad1 = info.cp - *group.get<Transform::Position>(entity1).value();
-            rad2 = info.cp - *group.get<Transform::Position>(entity2).value();
+            rad1 = info.contact_point - *group.get<Transform::Position>(entity1).value();
+            rad2 = info.contact_point - *group.get<Transform::Position>(entity2).value();
             
-            _solver->processReaction(info.cn, sfric, dfric, bounce, 
+            _solver->processReaction(info.contact_normal, sfric, dfric, bounce, 
                     tmp[1].inv_inertia, tmp[1].mass, rad1, *tmp[1].vel, *tmp[1].ang_vel, 
                     tmp[2].inv_inertia, tmp[2].mass, rad2, *tmp[2].vel, *tmp[2].ang_vel);
         }
