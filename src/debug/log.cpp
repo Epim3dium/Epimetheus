@@ -15,7 +15,7 @@ std::string FormatTime(std::chrono::system_clock::time_point tp) {
 }
 
 LogLevel Log::ReportingLevel = DEBUG3;
-LogOutput* Log::out = new Output2Cerr();
+std::unique_ptr<LogOutput> Log::out = std::make_unique<Output2Cerr>(Output2Cerr());
 
 Log::Log()
 {
@@ -35,11 +35,28 @@ Log::~Log()
     out->Output(os.str());
 }
 
+#ifdef __unix__ 
 std::string Log::ToString(LogLevel level)
 {
 	static const char* const buffer[] = {"ERROR", "WARNING", "INFO", "DEBUG", "DEBUG1", "DEBUG2", "DEBUG3", "DEBUG4", "DEBUG5"};
     return buffer[level];
 }
+#else
+std::string Log::ToString(LogLevel level)
+{
+	static const char* const buffer[] = {
+        "\033[0;31mERROR\033[0m",
+        "\033[0;33mWARNING\033[0m",
+        "\033[1;37mINFO\033[0m",
+        "\033[0;36mDEBUG\033[0m",
+        "\033[0;36mDEBUG1\033[0m",
+        "\033[0;36mDEBUG2\033[0m",
+        "\033[0;36mDEBUG3\033[0m",
+        "\033[0;36mDEBUG4\033[0m",
+        "\033[0;36mDEBUG5\033[0m"};
+    return buffer[level];
+}
+#endif
 
 
 std::string NowTime() {

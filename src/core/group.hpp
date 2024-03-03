@@ -103,7 +103,7 @@ public:
     }
 
 
-    bool contains(Entity entity) {
+    bool contains(Entity entity) const {
         auto itr = m_entityToIndex.find(entity);
         if(itr != m_entityToIndex.end()) {
             return true;
@@ -120,7 +120,21 @@ public:
         return {};
     }
     template<class CompTy>
-    std::optional<CompTy*> get(Entity entity) {
+    std::optional<CompTy*> try_get(Entity entity) {
+        static_assert(is_present<CompTy, Types...>::value);
+        auto index_found = getIndex(entity);
+        if(!index_found.has_value()) {
+            return {};
+        }
+        size_t index = index_found.value();
+        return &std::get<std::vector<CompTy>>(m_data)[index];
+    }
+    template<class CompTy>
+    CompTy& get(Entity entity) {
+        return *try_get<CompTy>(entity).value();
+    }
+    template<class CompTy>
+    std::optional<const CompTy *> try_cget(Entity entity) const {
         static_assert(is_present<CompTy, Types...>::value);
         auto index_found = getIndex(entity);
         if(!index_found.has_value()) {
@@ -131,15 +145,8 @@ public:
         
     }
     template<class CompTy>
-    std::optional<const CompTy *> cget(Entity entity) const {
-        static_assert(is_present<CompTy, Types...>::value);
-        auto index_found = getIndex(entity);
-        if(!index_found.has_value()) {
-            return {};
-        }
-        size_t index = index_found.value();
-        return &std::get<std::vector<CompTy>>(m_data)[index];
-        
+    const CompTy& cget(Entity entity) const {
+        return *try_cget<CompTy>(entity).value();
     }
     std::tuple<Types&...> at(Entity entity) {
         auto index_found = getIndex(entity);

@@ -61,9 +61,9 @@ public:
         return MasterClass::get<CompTy>(owner);
     }
     void setModel(Entity owner, ShapeModel model) {
-        auto& model_ref = *MasterClass::get<ShapeModel>(owner).value();
+        auto& model_ref = *MasterClass::try_get<ShapeModel>(owner).value();
         model_ref = model;
-        auto& inertia_ref = *MasterClass::get<InertiaDevMass>(owner).value();
+        auto& inertia_ref = *MasterClass::try_get<InertiaDevMass>(owner).value();
         
         auto dummy_transformed = transformPartitionShape(model, sf::Transform::Identity);
         inertia_ref = Collider::calcInertiaDevMass(dummy_transformed);

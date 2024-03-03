@@ -27,6 +27,7 @@ enum LogLevel {
 class LogOutput {
 public:
     virtual void Output(std::string msg) = 0;
+    virtual ~LogOutput() {}
 };
 
 class Log
@@ -36,7 +37,7 @@ public:
     virtual ~Log();
     std::ostringstream& Get(LogLevel level = INFO);
 public:
-    static LogOutput* out;
+    static std::unique_ptr<LogOutput> out;
     static LogLevel ReportingLevel;
     static std::string ToString(LogLevel level);
 protected:
@@ -57,6 +58,12 @@ class Output2FILE : public  LogOutput {
     std::ofstream file;
 public:
     void Output(std::string msg) override {
+        auto begin_esc = msg.find('\033');
+        if(begin_esc != std::string::npos) {
+            auto end_esc = msg.find('m', begin_esc);
+            assert(end_esc != std::string::npos);
+            msg.erase(begin_esc, end_esc - begin_esc);
+        }
         file << msg;
     }
     Output2FILE(std::string filename) : file(filename) {}
@@ -70,6 +77,11 @@ public:
     if (level > FILELOG_MAX_LEVEL) ;\
     else if (level > Log::ReportingLevel) ; \
     else Log().Get(level)
+
+#define EPI_LOG_TRACE(level) \
+    if (level > FILELOG_MAX_LEVEL) ;\
+    else if (level > Log::ReportingLevel) ; \
+    else Log().Get(level) << "{ in file: " << __FILE__ << ", at line: " << __LINE__ << " }:"
 
 //#define L_(level) \
 //if (level > FILELOG_MAX_LEVEL) ;\

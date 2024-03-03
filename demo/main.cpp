@@ -31,13 +31,14 @@ typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
     TransformGroup;
 void updateParentTransformByHierarchy(
     OwnerSlice<LocalTransform, GlobalTransform> slice,
-    const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) {
+    const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) 
+{
     size_t to_update = 0;
     int iter = 0;
     for (auto to_update_index : layer_info.second) {
         auto [e, my_trans, global_trans] = slice[to_update_index];
 
-        auto parent_maybe = hierarchy.cget<Hierarchy::Parent>(e);
+        auto parent_maybe = hierarchy.try_cget<Hierarchy::Parent>(e);
         assert(parent_maybe.has_value());
         auto parent = *parent_maybe.value();
 
@@ -62,12 +63,31 @@ struct System {
     std::unordered_map<Entity, sf::Color> color_table;
     std::unordered_map<Entity, std::string> name_table;
     void add(Entity id, std::string name, Transform::Position p, Transform::Rotation r, Hierarchy::Parent parent,
-             sf::Color color) {
+             sf::Color color, std::vector<vec2f> model) {
         name_table[id] = name;
         transforms.push_back(id, p, r);
         hierarchy.push_back(id, parent, Hierarchy::Children{});
-        hierarchy.get<Hierarchy::Children>(parent).value()->push_back(id);
+        hierarchy.try_get<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
+        rb_sys.push_back(id, Rigidbody::isStaticFlag(false));
+        mat_sys.push_back(id);
+        col_sys.push_back(id, model);
+    }
+    void add(Entity id, std::string name, Hierarchy::Parent parent,
+             sf::Color color, std::vector<vec2f> points, bool isStatic = false) {
+        name_table[id] = name;
+        auto avg = std::reduce(points.begin(), points.end()) / static_cast<float>(points.size());
+        for(auto& p : points) {
+            p -= avg;
+        }
+        
+        transforms.push_back(id, Position(avg), Rotation{0.f});
+        hierarchy.push_back(id, parent, Hierarchy::Children{});
+        hierarchy.try_get<Hierarchy::Children>(parent).value()->push_back(id);
+        color_table[id] = color;
+        rb_sys.push_back(id, Rigidbody::isStaticFlag(isStatic));
+        mat_sys.push_back(id);
+        col_sys.push_back(id, points);
     }
     System() {
         hierarchy.setDefault(Hierarchy::Parent(world));
@@ -91,23 +111,24 @@ int main() {
     std::vector<vec2f> model_red = {vec2f(100.f, 100.f), vec2f(100.f, -100.f), vec2f(-100.f, -100.f), vec2f(-150.f, 0.f), vec2f(-100.f, 100.f)};
     std::vector<vec2f> model_green = {vec2f(0.f, 60.f), vec2f(78.f, -30.f), vec2f(-78.f, -30.f)};
     
-    sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{0.f}, Parent{sys.world}, sf::Color::Red);
-    sys.rb_sys.push_back(red, Rigidbody::isStaticFlag(false));
-    sys.mat_sys.push_back(red);
-    sys.col_sys.push_back(red, model_red);
-    sys.add(magenta, "magenta", Position{{100.f, 100.f}}, Rotation{},     Parent{red},       sf::Color::Magenta);
-    sys.add(yellow,  "yellow",  Position{{10.f,  0.f}},   Rotation{},     Parent{magenta},   sf::Color::Yellow);
-    sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green);
-    sys.rb_sys.push_back(green, Rigidbody::isStaticFlag(false));
-    sys.mat_sys.push_back(green);
-    sys.col_sys.push_back(green, model_green);
+    sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{0.f}, Parent{sys.world}, sf::Color::Red, model_red);
+    sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green, model_green);
     
-    sys.add(blue,    "blue",    Position{{600.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Blue);
+    vec2f win_size = {1000.f, 1000.f};
+    AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
+    AABB small_aabb = AABB::CreateCenterSize(big_aabb.center(), big_aabb.size() * 0.9f); 
+    sys.add(yellow,     "yellow", Parent{sys.world}, sf::Color::Yellow, {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
+    sys.add(magenta,     "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
 
-    auto info = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+    auto hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
 
     // create the window
-    sf::RenderWindow window(sf::VideoMode(1000, 1000), "My window");
+    sf::ContextSettings settings;
+    settings.antialiasingLevel = 4.0;
+    sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Default, settings);
+    
+    
+        
     assert(ImGui::SFML::Init(window));
     ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
     sf::Clock delTclock;
@@ -128,10 +149,12 @@ int main() {
 
         // clear the window with black color
         window.clear(sf::Color::Black);
+        
         Transform::updateLocalTransforms(sys.transforms.slice<Position, Rotation, Scale, LocalTransform>());
+        
         updateParentTransformByHierarchy(
             sys.transforms.sliceOwner<LocalTransform, GlobalTransform>(),
-            sys.hierarchy, info);
+            sys.hierarchy, hierarchy_bfs);
 
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
@@ -149,7 +172,7 @@ int main() {
             cs.setFillColor(sys.color_table[ids[i]]);
             window.draw(cs);
         }
-        auto vel = sys.rb_sys.get<Rigidbody::Velocity>(red);
+        auto vel = sys.rb_sys.try_get<Rigidbody::Velocity>(red);
         Collider::updateCollisionShapes(sys.col_sys.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(), sys.transforms.slice<Transform::GlobalTransform>());
         for(auto [shape] : sys.col_sys.slice<Collider::ShapeTransformedPartitioned>()) {
             sf::Vertex vert[2];
@@ -189,15 +212,15 @@ int main() {
             }
             for (auto [e, name] : sys.name_table) {
                 if (selected != name) {
-                    if(sys.rb_sys.get<Rigidbody::isStaticFlag>(e).has_value())
-                        *sys.rb_sys.get<Rigidbody::isStaticFlag>(e).value() = false;
+                    // if(sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).has_value())
+                    //     *sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).value() = false;
                     continue;
                 }
-                *sys.rb_sys.get<Rigidbody::isStaticFlag>(e).value() = true;
+                *sys.rb_sys.try_get<Rigidbody::Velocity>(e).value() = vec2f();
                 ImGui::BeginChild(("tab " + name).c_str());
                 ImGui::Text("%s", (name + " settings:").c_str());
                 auto& ref_pos =
-                    *sys.transforms.get<Position>(e).value();
+                    *sys.transforms.try_get<Position>(e).value();
                 auto height = window.getView().getSize().y;
                 ref_pos.y = height - ref_pos.y;
                 slider2D(name + " pos", &ref_pos, {0.f, 0.f},
@@ -205,12 +228,12 @@ int main() {
                 ref_pos.y = height - ref_pos.y;
 
                 auto& ref_scale =
-                    *sys.transforms.get<Scale>(e).value();
+                    *sys.transforms.try_get<Scale>(e).value();
                 slider2D(name + " scale", &ref_scale, {-2.f, -2.f}, {2.f, 2.f},
                          1.f);
 
                 auto& ref_rotate =
-                    *sys.transforms.get<Rotation>(e).value();
+                    *sys.transforms.try_get<Rotation>(e).value();
                 float& f = ref_rotate;
                 ImGui::SliderFloat((name + " rotation").c_str(),
                                    &f, 0.f, M_PI * 2.f);
