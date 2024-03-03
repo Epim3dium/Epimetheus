@@ -2,14 +2,13 @@
 namespace epi {
 namespace Collider {
 
-std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const sf::Transform& transform) {
-    auto transformed_points = Transform::transformPoints(model_points, transform);
-    if(!isTriangulable(transformed_points))
-        std::reverse(transformed_points.begin(), transformed_points.end());
-
-    assert(isTriangulable(transformed_points));
+std::vector<std::vector<vec2f>> partitionShape(std::vector<vec2f> model_points) {
+    if(!isTriangulable(model_points))
+        std::reverse(model_points.begin(), model_points.end());
     
-    auto triangles = triangulate(transformed_points);
+    assert(isTriangulable(model_points));
+    
+    auto triangles = triangulate(model_points);
     auto convex_polygons = partitionConvex(triangles);
     return convex_polygons;
 }
@@ -20,11 +19,22 @@ float calcInertiaDevMass(const std::vector<std::vector<vec2f>>& model_points) {
     }
     return result;
 }
-void updateCollisionShapes(OwnerSlice<ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice) {
-    for(auto [owner, model, result] : shape_slice) {
-        auto transform_maybe = transform_slice.get<Transform::GlobalTransform>(owner);
-        assert(transform_maybe.has_value());
-        result = transformPartitionShape(model, *transform_maybe.value());
+void calcParitionedShapes(Slice<ShapeModel, ShapePartitioned> shape_slice) {
+    for(auto [model, partitined] : shape_slice) {
+        // auto transform_maybe = transform_slice.get<Transform::GlobalTransform>(owner);
+        // assert(transform_maybe.has_value());
+        partitined = partitionShape(model);
+    }
+}
+void updatePartitionedTransformedShapes(OwnerSlice<ShapePartitioned, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice){
+    for(auto [owner, partitioned, trans_part] : shape_slice) {
+        assert(transform_slice.contains(owner)) ;
+        const auto& trans = transform_slice.get<Transform::GlobalTransform>(owner);
+        
+        trans_part = partitioned;
+        for(auto& convex : trans_part) {
+            convex = Transform::transformPoints(convex, trans);
+        }
     }
 }
 

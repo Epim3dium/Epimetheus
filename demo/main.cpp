@@ -5,6 +5,7 @@
 
 #include "core/hierarchy.hpp"
 #include "core/group.hpp"
+#include "debug/log.hpp"
 #include "physics/collider.hpp"
 #include "physics/physics_manager.hpp"
 #include "physics/rigidbody.hpp"
@@ -45,9 +46,8 @@ void updateParentTransformByHierarchy(
         if (parent == e)
             continue;
 
-        auto global_trans_maybe = slice.get<GlobalTransform>(parent);
-        assert(global_trans_maybe.has_value());
-        global_trans = *global_trans_maybe.value();
+        const auto& global_trans_maybe = slice.get<GlobalTransform>(parent);
+        global_trans = global_trans_maybe;
         global_trans.combine(my_trans);
     }
 }
@@ -108,24 +108,22 @@ int main() {
     Entity green;
     Entity blue;
     
-    std::vector<vec2f> model_red = {vec2f(100.f, 100.f), vec2f(100.f, -100.f), vec2f(-100.f, -100.f), vec2f(-150.f, 0.f), vec2f(-100.f, 100.f)};
-    std::vector<vec2f> model_green = {vec2f(0.f, 60.f), vec2f(78.f, -30.f), vec2f(-78.f, -30.f)};
+    std::vector<vec2f> model_rect = {vec2f(50.f, 50.f), vec2f(50.f, -50.f), vec2f(-50.f, -50.f), vec2f(-50.f, 50.f)};
     
-    sys.add(red,     "red",     Position{{100.f, 100.f}}, Rotation{0.f}, Parent{sys.world}, sf::Color::Red, model_red);
-    sys.add(green,   "green",   Position{{400.f, 100.f}}, Rotation{},     Parent{sys.world}, sf::Color::Green, model_green);
     
     vec2f win_size = {1000.f, 1000.f};
     AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
     AABB small_aabb = AABB::CreateCenterSize(big_aabb.center(), big_aabb.size() * 0.9f); 
     sys.add(yellow,     "yellow", Parent{sys.world}, sf::Color::Yellow, {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
     sys.add(magenta,     "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
+    sys.add(red,     "red", Parent{sys.world}, sf::Color::Red, {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
+    sys.add(green,     "green", Parent{sys.world}, sf::Color::Green, {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
+    sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
 
     auto hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
 
     // create the window
-    sf::ContextSettings settings;
-    settings.antialiasingLevel = 4.0;
-    sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Default, settings);
+    sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Close);
     
     
         
@@ -142,6 +140,14 @@ int main() {
             // "close requested" event: we close the window
             if (event.type == sf::Event::Closed)
                 window.close();
+            if(event.type == sf::Event::KeyPressed) {
+                if(event.key.code == sf::Keyboard::V) {
+                    auto mouse_pos = sf::Mouse::getPosition(window);
+                    EPI_LOG(LogLevel::DEBUG) << mouse_pos.x << "\t" << mouse_pos.y;
+                    sys.add(Entity(), "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
+                    hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+                }
+            }
             ImGui::SFML::ProcessEvent(event);
         }
         auto delTtime = delTclock.restart();
@@ -173,7 +179,12 @@ int main() {
             window.draw(cs);
         }
         auto vel = sys.rb_sys.try_get<Rigidbody::Velocity>(red);
-        Collider::updateCollisionShapes(sys.col_sys.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(), sys.transforms.slice<Transform::GlobalTransform>());
+        
+        Collider::calcParitionedShapes(sys.col_sys.slice<Collider::ShapeModel, Collider::ShapePartitioned>());
+        Collider::updatePartitionedTransformedShapes(
+            sys.col_sys.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
+            sys.transforms.slice<Transform::GlobalTransform>());
+        
         for(auto [shape] : sys.col_sys.slice<Collider::ShapeTransformedPartitioned>()) {
             sf::Vertex vert[2];
             vert[0].color = sf::Color::Cyan;
@@ -202,9 +213,13 @@ int main() {
                 *vec = tmp;
             };
             ImGui::Begin("settings");
-            static std::string selected;
+            ImGui::Text("ObjectCount: %zu", sys.transforms.size());
+            ImGui::Text("FPS: %f", 1.0 / delTtime.asSeconds());
+            static std::string selected = sys.name_table.begin()->second;
             ImGui::Dummy({});
             for (auto [e, name] : sys.name_table) {
+                if(name == "")
+                    continue;;
                 ImGui::SameLine();
                 if (ImGui::Button(name.c_str(), {50.f, 20.f})) {
                     selected = name;

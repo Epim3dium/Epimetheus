@@ -27,7 +27,7 @@ private:
         Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform, Transform::GlobalTransform,
         Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag, Rigidbody::Force, Rigidbody::Velocity, Rigidbody::AngularForce, Rigidbody::AngularVelocity, Rigidbody::Mass,
         Material::AirDrag, Material::StaticFric, Material::DynamicFric, Material::Restitution,
-        Collider::isTriggerFlag, Collider::ShapeModel, Collider::InertiaDevMass, Collider::Tag, Collider::Mask, Collider::ShapeTransformedPartitioned>
+        Collider::isTriggerFlag, Collider::ShapeModel, Collider::InertiaDevMass, Collider::Tag, Collider::Mask, Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>
             CollisionManifoldGroup;
     template<class T>
     static T selectFrom(T a, T b, eSelectMode mode) {

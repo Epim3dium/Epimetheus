@@ -16,11 +16,7 @@ namespace epi {
 CollisionInfo detectOverlap(const ConvexPolygon& p1, const ConvexPolygon& p2) {
     auto intersection = intersectPolygonPolygon(p1, p2);
     if(intersection.detected) {
-        auto cps = findContactPoints(p1, p2);
-        if(cps.size() == 0 )
-            return {false};
-        auto cp = std::reduce(cps.begin(), cps.end()) / static_cast<float>(cps.size());
-        return {true, intersection.contact_normal, cp /* {intersection.cp} */ , intersection.overlap};
+        return {true, intersection.contact_normal, intersection.cp, intersection.overlap};
     }
     return {false};
 }

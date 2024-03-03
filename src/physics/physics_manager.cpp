@@ -127,6 +127,11 @@ PhysicsManager::filterBroadPhaseResults(const CollisionManifoldGroup& group,
             EPI_LOG(LogLevel::DEBUG1) << "tried to process non existing entity [" << entity2() << "]";
             continue;
         }
+        auto& isStat1 = group.cget<Rigidbody::isStaticFlag>(entity1);
+        auto& isStat2 =  group.cget<Rigidbody::isStaticFlag>(entity2);
+        if(isStat1 && isStat2)
+            continue;
+        
         auto& mask1 = group.cget<Collider::Mask>(entity1);
         auto& tag1 =  group.cget<Collider::Tag>(entity1);
         auto& mask2 = group.cget<Collider::Mask>(entity2);
@@ -369,7 +374,8 @@ void PhysicsManager::integrate( float delT, CollisionManifoldGroup& group) const
     integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::Velocity, Transform::Position>           ());
     integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::AngularVelocity, Transform::Rotation>    ());
     for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
-        vel.y += delT * 500.f;
+        static constexpr float gravity = 1000.f;
+        vel.y += delT * gravity;
     }
 }
 void PhysicsManager::rollbackGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const {
@@ -391,18 +397,25 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     resetNonMovingObjects( objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
                                 Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
     
-    for(int i = 0; i < steps; i++) {
+    Collider::calcParitionedShapes(objects.slice<Collider::ShapeModel, Collider::ShapePartitioned>());
+    Collider::updatePartitionedTransformedShapes(
+        objects.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
+        objects.slice<Transform::GlobalTransform>());
+
+    
+    auto potential_col_list = processBroadPhase(objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
+    auto col_list = filterBroadPhaseResults(objects, potential_col_list);
+    for (int i = 0; i < steps; i++) {
         integrate(deltaStep, objects);
         
         rollbackGlobalTransform         (objects.slice<Transform::GlobalTransform, Transform::LocalTransform>                                ());
         Transform::updateLocalTransforms(objects.slice<Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform>());
         updateGlobalTransform           (objects.slice<Transform::GlobalTransform, Transform::LocalTransform>                                ());
         
-        Collider::updateCollisionShapes(objects.sliceOwner<Collider::ShapeModel, Collider::ShapeTransformedPartitioned>(),
+        Collider::updatePartitionedTransformedShapes(
+                objects.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
                 objects.slice<Transform::GlobalTransform>());
         
-        auto potential_col_list = processBroadPhase(objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
-        auto col_list = filterBroadPhaseResults(objects, potential_col_list);
         
         processNarrowPhase(objects, col_list);
     }

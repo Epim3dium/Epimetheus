@@ -59,7 +59,6 @@ std::vector<std::vector<vec2f>> triangulateEarClipping(const std::vector<vec2f>&
             break;
         }
         if (res_size_last == result.size()) {
-            std::cerr << "flagged";
             break;
         }
     }

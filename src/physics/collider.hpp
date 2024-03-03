@@ -39,6 +39,7 @@ struct ColliderEvent {
 namespace Collider {
 //variables
 EPI_WRAP_TYPE(std::vector<vec2f>, ShapeModel);
+EPI_WRAP_TYPE(std::vector<std::vector<vec2f>>, ShapePartitioned);
 EPI_WRAP_TYPE(std::vector<std::vector<vec2f>>, ShapeTransformedPartitioned);
 EPI_WRAP_TYPE(PrimitiveWrapper<bool>, isTriggerFlag);
 EPI_WRAP_TYPE(PrimitiveWrapper<float>, InertiaDevMass);
@@ -46,13 +47,13 @@ EPI_WRAP_TYPE(epi::Set<std::string>, Tag);
 EPI_WRAP_TYPE(epi::Set<std::string>, Mask);
 
 //funtions used
-std::vector<std::vector<vec2f>> transformPartitionShape(const std::vector<vec2f>& model_points, const sf::Transform& transform);
+std::vector<std::vector<vec2f>> partitionShape(std::vector<vec2f> model_points);
 float calcInertiaDevMass(const std::vector<std::vector<vec2f>>& model_points);
 
 //system
 class System
-    : public Group<ShapeModel, isTriggerFlag, InertiaDevMass, Tag, Mask, ShapeTransformedPartitioned> {
-    typedef Group<ShapeModel, isTriggerFlag, InertiaDevMass, Tag, Mask, ShapeTransformedPartitioned> MasterClass;
+    : public Group<ShapeModel, isTriggerFlag, InertiaDevMass, Tag, Mask, ShapePartitioned, ShapeTransformedPartitioned> {
+    typedef Group<ShapeModel, isTriggerFlag, InertiaDevMass, Tag, Mask, ShapePartitioned, ShapeTransformedPartitioned> MasterClass;
     
 public:
     template<class CompTy>
@@ -61,28 +62,30 @@ public:
         return MasterClass::get<CompTy>(owner);
     }
     void setModel(Entity owner, ShapeModel model) {
-        auto& model_ref = *MasterClass::try_get<ShapeModel>(owner).value();
+        auto& model_ref = MasterClass::get<ShapeModel>(owner);
         model_ref = model;
-        auto& inertia_ref = *MasterClass::try_get<InertiaDevMass>(owner).value();
         
-        auto dummy_transformed = transformPartitionShape(model, sf::Transform::Identity);
-        inertia_ref = Collider::calcInertiaDevMass(dummy_transformed);
+        auto& inertia_ref = MasterClass::get<InertiaDevMass>(owner);
+        
+        auto partitioned = partitionShape(model);
+        inertia_ref = Collider::calcInertiaDevMass(partitioned);
     }
     
     void push_back(Entity owner, const std::vector<vec2f>& model,
                    bool isTrigger = false, epi::Set<std::string> tags = {},
                    epi::Set<std::string> masks = {}) {
-        auto dummy_transformed = transformPartitionShape(model, sf::Transform::Identity);
-        auto inertia = Collider::calcInertiaDevMass(dummy_transformed);
+        auto partitioned = partitionShape(model);
+        auto inertia = Collider::calcInertiaDevMass(partitioned);
         MasterClass::push_back(owner, {model}, {isTrigger},
-                {inertia}, {tags}, {masks}, { ShapeTransformedPartitioned()});
+                {inertia}, {tags}, {masks}, {ShapePartitioned()}, { ShapeTransformedPartitioned()});
     }
     System() {
         setDefault<isTriggerFlag>({false});
         setDefault<InertiaDevMass>({1.f});
     }
 };
-void updateCollisionShapes(OwnerSlice<ShapeModel, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice);
+void calcParitionedShapes(Slice<ShapeModel, ShapePartitioned> shape_slice);
+void updatePartitionedTransformedShapes(OwnerSlice<ShapePartitioned, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice);
 
 };
 

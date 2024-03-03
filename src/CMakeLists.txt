@@ -52,8 +52,5 @@ include_directories(.)
 add_library(epimetheus
     ${SOURCE_FILES} ${HEADER_FILES}
 )
+target_compile_options(epimetheus PRIVATE -glldb)
 
-add_compile_options(
-    "$<$<CONFIG:RELEASE>:-o3>"
-    "$<$<CONFIG:DEBUG>:-glldb>"
-)

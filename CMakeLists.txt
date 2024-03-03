@@ -6,12 +6,13 @@ project(epimetheus
 )
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
+add_compile_options(
+    -glldb
+)
 
 if(POLICY CMP0079 )
   cmake_policy(SET CMP0079 NEW)
 endif()
-set(CMAKE_CXX_FLAGS_DEBUG "-O0")
-set(CMAKE_C_FLAGS_DEBUG "-O0")
 
 add_subdirectory(dependancies)
 add_subdirectory(src)

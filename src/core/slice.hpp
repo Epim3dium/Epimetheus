@@ -59,7 +59,7 @@ public:
     //     return *(begin() + index);
     // }
     template<class CompTy>
-    std::optional<CompTy*> get(Entity entity) {
+    std::optional<CompTy*> try_get(Entity entity) {
         static_assert(is_present<CompTy, Types...>::value);
         auto index_found = getIndex(entity);
         if(!index_found.has_value()) {
@@ -67,6 +67,10 @@ public:
         }
         size_t index = index_found.value();
         return &std::get<std::span<CompTy>>(m_data_spans)[index];
+    }
+    template<class CompTy>
+    CompTy& get(Entity entity) {
+        return *try_get<CompTy>(entity).value();
     }
     iterator begin() {
         return std::apply([&](auto&... spans) {
