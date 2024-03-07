@@ -30,6 +30,8 @@ public:
     static_assert(std::is_fundamental<T>::value);
     operator T&(){return Object;}
     operator T() const {return Object;}
+    T& get() {return Object;}
+    T& get() const {return Object;}
     PrimitiveWrapper() {}
     PrimitiveWrapper(const T& v) : Object(v) {}
     PrimitiveWrapper(T&& v) : Object(v) {}

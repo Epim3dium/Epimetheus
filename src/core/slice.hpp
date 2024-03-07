@@ -32,8 +32,8 @@ class Slice {
 public:
     using iterator = RawParallelIterator<Types...>;
     using const_iterator = RawParallelIterator<const Types...>;
-    using reverse_iterator = RawReverseParallelIterator<Types...>;
-    using const_reverse_iterator = RawReverseParallelIterator<const Types...>;
+    // using reverse_iterator = RawReverseParallelIterator<Types...>;
+    // using const_reverse_iterator = RawReverseParallelIterator<const Types...>;
     Slice(const std::unordered_map<Entity, size_t>& entityToIndexMap, std::vector<Types>& ...vectors)
         : m_data_spans({vectors.data(), vectors.size()}...),
         m_entityToIndex(entityToIndexMap)
@@ -48,9 +48,6 @@ public:
     }
     size_t size() const {
         return m_entityToIndex.size();
-    }
-    typename iterator::reference operator[](size_t index) {
-        return *(std::next(this->begin(), index));
     }
     bool contains(Entity e) const {
         return m_entityToIndex.contains(e);
@@ -92,26 +89,26 @@ public:
                 return const_iterator(spans.data() + spans.size()...);
             }, m_data_spans); 
     }
-    reverse_iterator rbegin() {
-        return std::apply([&](auto&... spans) {
-                return reverse_iterator(spans.data() + spans.size() - 1 ...);
-            }, m_data_spans); 
-    }
-    reverse_iterator rend() {
-        return std::apply([&](auto&... spans) {
-                return reverse_iterator(spans.data() - 1 ...);
-            }, m_data_spans); 
-    }
-    const_reverse_iterator crbegin() const {
-        return std::apply([&](auto&... spans) {
-                return const_reverse_iterator(spans.data() + spans.size() - 1 ...);
-            }, m_data_spans); 
-    }
-    const_reverse_iterator crend() const {
-        return std::apply([&](auto&... spans) {
-                return const_reverse_iterator(spans.data() - 1 ...);
-            }, m_data_spans); 
-    }
+    // reverse_iterator rbegin() {
+    //     return std::apply([&](auto&... spans) {
+    //             return reverse_iterator(spans.data() + spans.size() - 1 ...);
+    //         }, m_data_spans); 
+    // }
+    // reverse_iterator rend() {
+    //     return std::apply([&](auto&... spans) {
+    //             return reverse_iterator(spans.data() - 1 ...);
+    //         }, m_data_spans); 
+    // }
+    // const_reverse_iterator crbegin() const {
+    //     return std::apply([&](auto&... spans) {
+    //             return const_reverse_iterator(spans.data() + spans.size() - 1 ...);
+    //         }, m_data_spans); 
+    // }
+    // const_reverse_iterator crend() const {
+    //     return std::apply([&](auto&... spans) {
+    //             return const_reverse_iterator(spans.data() - 1 ...);
+    //         }, m_data_spans); 
+    // }
 };
 template<class ...Types>
 struct OwnerSlice : Slice<Entity, Types...> {

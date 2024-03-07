@@ -37,7 +37,7 @@ void updateParentTransformByHierarchy(
     size_t to_update = 0;
     int iter = 0;
     for (auto to_update_index : layer_info.second) {
-        auto [e, my_trans, global_trans] = slice[to_update_index];
+        auto [e, my_trans, global_trans] = *std::next(slice.begin(), to_update_index);
 
         auto parent_maybe = hierarchy.try_cget<Hierarchy::Parent>(e);
         assert(parent_maybe.has_value());
@@ -108,17 +108,16 @@ int main() {
     Entity green;
     Entity blue;
     
-    std::vector<vec2f> model_rect = {vec2f(50.f, 50.f), vec2f(50.f, -50.f), vec2f(-50.f, -50.f), vec2f(-50.f, 50.f)};
+    std::vector<vec2f> model_rect = {vec2f(30.f, 30.f), vec2f(30.f, -30.f), vec2f(-30.f, -30.f), vec2f(-30.f, 30.f)};
     
-    
-    vec2f win_size = {1000.f, 1000.f};
+    vec2f win_size = {800.f, 800.f};
     AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
     AABB small_aabb = AABB::CreateCenterSize(big_aabb.center(), big_aabb.size() * 0.9f); 
     sys.add(yellow,     "yellow", Parent{sys.world}, sf::Color::Yellow, {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
     sys.add(magenta,     "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
     sys.add(red,     "red", Parent{sys.world}, sf::Color::Red, {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
     sys.add(green,     "green", Parent{sys.world}, sf::Color::Green, {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
-    sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
+    // sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
 
     auto hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
 
@@ -387,13 +386,12 @@ bool SliderScalar2D(char const* pLabel, float* fValueX, float* fValueY,
     ImU32 const uTextCol =
         ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_Text]);
 
-    ImGui::SetWindowFontScale(0.75f);
-
-    ImVec2 const vXSize = ImGui::CalcTextSize(pBufferX);
-    ImVec2 const vYSize = ImGui::CalcTextSize(pBufferY);
+    ImVec2 vXSize = ImGui::CalcTextSize(pBufferX);
+    ImVec2 vYSize = ImGui::CalcTextSize(pBufferY);
+    vYSize.x = 0;
 
     ImVec2 const vHandlePosX =
-        ImVec2(vCursorPos.x, oRect.Max.y + vYSize.x * 0.5f);
+        ImVec2(vCursorPos.x, oRect.Max.y + vXSize.x * 0.5f);
     ImVec2 const vHandlePosY = ImVec2(
         oRect.Max.x + fHandleOffsetCoef * fCursorOff + vYSize.x, vCursorPos.y);
 

@@ -59,10 +59,11 @@ class Output2FILE : public  LogOutput {
 public:
     void Output(std::string msg) override {
         auto begin_esc = msg.find('\033');
-        if(begin_esc != std::string::npos) {
+        while(begin_esc != std::string::npos) {
             auto end_esc = msg.find('m', begin_esc);
             assert(end_esc != std::string::npos);
             msg.erase(begin_esc, end_esc - begin_esc);
+            begin_esc = msg.find('\033');
         }
         file << msg;
     }

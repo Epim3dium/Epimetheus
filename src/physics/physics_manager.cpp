@@ -66,10 +66,11 @@ std::vector<PhysicsManager::ColParticipants> PhysicsManager::processBroadPhase(
     std::vector<PhysicsManager::ColParticipants> result;
     struct SwipeeInformation {
         float x_value;
-        Entity owner;
+        size_t idx;
         AABB aabb;
     };
     std::vector<SwipeeInformation> sweep_along_x;
+    size_t index = 0;
     for(auto [owner, shape] : slice) {
         AABB aabb = AABB::Expandable();
         for(auto& convex : shape) {
@@ -77,22 +78,23 @@ std::vector<PhysicsManager::ColParticipants> PhysicsManager::processBroadPhase(
                 aabb.expandToContain(point);
             }
         }
-        sweep_along_x.push_back({aabb.min.x, owner, aabb});
-        sweep_along_x.push_back({aabb.max.x, owner, aabb});
+        sweep_along_x.push_back({aabb.min.x, index, aabb});
+        sweep_along_x.push_back({aabb.max.x, index, aabb});
+        index++;
     }
     std::sort(sweep_along_x.begin(), sweep_along_x.end(),
         [](const SwipeeInformation& p1, const SwipeeInformation& p2) {
             return p1.x_value < p2.x_value;
         });
     struct OpenedSwipee {
-        Entity owner;
+        size_t idx;
         AABB aabb;
     };
     std::vector<OpenedSwipee> open;
     for(auto evaluated : sweep_along_x) {
         auto itr = std::find_if(open.begin(), open.end(), 
             [&](const OpenedSwipee& p) {
-                return p.owner == evaluated.owner;
+                return p.idx == evaluated.idx;
             });
         //delete if already was opened
         if(itr != open.end()) {
@@ -105,131 +107,120 @@ std::vector<PhysicsManager::ColParticipants> PhysicsManager::processBroadPhase(
         auto aabb = evaluated.aabb;
         for(auto other : open) {
             if(isOverlappingAABBAABB(other.aabb, aabb)) {
-                assert(other.owner != evaluated.owner);
-                result.push_back({evaluated.owner, other.owner});
+                assert(other.idx != evaluated.idx);
+                result.push_back({evaluated.idx, other.idx});
             }
         }
-        open.push_back({evaluated.owner, aabb});
+        open.push_back({evaluated.idx, aabb});
     }
     return result;
 }
 std::vector<PhysicsManager::ColParticipants>
-PhysicsManager::filterBroadPhaseResults(const CollisionManifoldGroup& group,
+PhysicsManager::filterBroadPhaseResults(Slice<Rigidbody::isStaticFlag, Collider::Mask, Collider::Tag> comp_info,
                                         const std::vector<ColParticipants> broad_result) const {
     std::vector<PhysicsManager::ColParticipants> compatible_collisions;
     compatible_collisions.reserve(broad_result.size());
-    for(auto [entity1, entity2] : broad_result) {
-        if(!group.contains(entity1)) {
-            EPI_LOG(LogLevel::DEBUG1) << "tried to process non existing entity [" << entity1() << "]";
-            continue;
-        }
-        if(!group.contains(entity2)) {
-            EPI_LOG(LogLevel::DEBUG1) << "tried to process non existing entity [" << entity2() << "]";
-            continue;
-        }
-        auto& isStat1 = group.cget<Rigidbody::isStaticFlag>(entity1);
-        auto& isStat2 =  group.cget<Rigidbody::isStaticFlag>(entity2);
+    for(auto [idx1, idx2] : broad_result) {
+        auto [isStat1, mask1, tag1] = *(comp_info.begin() + idx1); 
+        auto [isStat2, mask2, tag2] = *(comp_info.begin() + idx2); 
         if(isStat1 && isStat2)
             continue;
-        
-        auto& mask1 = group.cget<Collider::Mask>(entity1);
-        auto& tag1 =  group.cget<Collider::Tag>(entity1);
-        auto& mask2 = group.cget<Collider::Mask>(entity2);
-        auto& tag2 =  group.cget<Collider::Tag>(entity2);
         if(areCompatible(mask1, tag1, mask2, tag2)) {
-            compatible_collisions.push_back({entity1, entity2});
+            compatible_collisions.push_back({idx1, idx2});
         }
     }
     return compatible_collisions;
 }
-std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(CollisionManifoldGroup& group, const std::vector<ColParticipants>& col_list) const {
+std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<Collider::ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
     std::vector<std::vector<CollisionInfo>> result;
     result.reserve(col_list.size());
-    for(auto [entity1, entity2] : col_list) {
-        const auto& shape1 = group.cget<Collider::ShapeTransformedPartitioned>(entity1);
-        const auto& shape2 = group.cget<Collider::ShapeTransformedPartitioned>(entity2);
+    for(auto [idx1, idx2] : col_list) {
+        auto [shape1] = *(shapes.begin() + idx1);
+        auto [shape2] = *(shapes.begin() + idx2);
         auto col_infos = _solver->detect(shape1, shape2);
-        result.push_back({});
-        for(auto info : col_infos) {
-            if(info.detected)
-                result.back().push_back(info);
-        }
+        result.push_back(col_infos);
     }
     return result;
 }
-void PhysicsManager::solveOverlaps(CollisionManifoldGroup& group, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const {
+void PhysicsManager::solveOverlaps(Slice<Rigidbody::isStaticFlag, Transform::Position, Transform::Rotation> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const {
     assert(col_list.size() == col_info.size());
     for(int i = 0; i < col_list.size(); i++) {
-        auto [entity1, entity2] = col_list[i];
-        auto isStatic1 = group.get<Rigidbody::isStaticFlag>(entity1);
-        auto& pos1 = group.get<Transform::Position>(entity1);
-        auto& rot1 = group.get<Transform::Rotation>(entity1);
-        auto isStatic2 = group.get<Rigidbody::isStaticFlag>(entity2);
-        auto& pos2 = group.get<Transform::Position>(entity2);
-        auto& rot2 = group.get<Transform::Rotation>(entity2);
+        auto [idx1, idx2] = col_list[i];
+        auto [isStatic1, pos1, rot1] = *(shape_info.begin() + idx1);
+        auto [isStatic2, pos2, rot2] = *(shape_info.begin() + idx2);
         for(const auto& info : col_info[i]) {
             _solver->solveOverlap(info, isStatic1, pos1, rot1, isStatic2, pos2, rot2);
         }
     }
 }
-void PhysicsManager::processReactions(CollisionManifoldGroup& group, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const {
-    struct MaterialTuple {
-        float sfric;
-        float dfric;
-        float bounce;
-    };
+std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(Slice<Material::Restitution, Material::StaticFric, Material::DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const {
     std::vector<MaterialTuple> selected_properties;
-    for(int i = 0; i < col_list.size(); i++) {
-        auto [entity1, entity2] = col_list[i];
-        float bounce1 = *group.try_cget<Material::Restitution>(entity1).value();
-        float sfric1 = *group.try_cget<Material::StaticFric>(entity1).value();
-        float dfric1 = *group.try_cget<Material::DynamicFric>(entity1).value();
-        float bounce2 = *group.try_cget<Material::Restitution>(entity2).value();
-        float sfric2 = *group.try_cget<Material::StaticFric>(entity2).value();
-        float dfric2 = *group.try_cget<Material::DynamicFric>(entity2).value();
+    for(auto [idx1, idx2] : col_part) {
+        auto [bounce1, sfric1, dfric1] = *(mat_info.begin() + idx1);
+        auto [bounce2, sfric2, dfric2] = *(mat_info.begin() + idx2);
         
-        float restitution = selectFrom(bounce1, bounce2, bounciness_select);
-        float sfriction = selectFrom(sfric1, sfric2, friction_select);
-        float dfriction = selectFrom(dfric1, dfric2, friction_select);
+        float restitution = selectFrom<float>(bounce1, bounce2, bounciness_select);
+        float sfriction = selectFrom<float>(sfric1, sfric2, friction_select);
+        float dfriction = selectFrom<float>(dfric1, dfric2, friction_select);
         selected_properties.push_back({restitution, sfriction, dfriction});
     }
+    return selected_properties;
+}
+void PhysicsManager::processReactions(Slice < Rigidbody::isStaticFlag, Rigidbody::Mass, Rigidbody::Velocity,
+                      Rigidbody::AngularVelocity, Collider::InertiaDevMass, Transform::Position> react_info,
+                      const std::vector<MaterialTuple>& mat_info,
+                      const std::vector<std::vector<CollisionInfo>>& col_info,
+                      const std::vector<ColParticipants>& col_list) const 
+{
+    assert(mat_info.size() == col_info.size());
+    assert(col_info.size() == col_list.size());
     for(int i = 0; i < col_list.size(); i++) {
-        auto [entity1, entity2] = col_list[i];
-        auto [bounce, sfric, dfric] = selected_properties[i];
-        struct {
-            float inv_inertia;
-            float mass;
-            vec2f* vel;
-            float* ang_vel;
-        }tmp[3];
-        size_t ii = 1;
-        float temp_f = 0.f;
-        vec2f temp;
-        for(auto e : {entity1, entity2}) {
-            auto isStatic = *group.try_cget<Rigidbody::isStaticFlag>(e).value();
-            
-            tmp[ii].mass = isStatic ? INFINITY : *group.try_cget<Rigidbody::Mass>(e).value();
-            tmp[ii].inv_inertia = 1.f / (isStatic ? INFINITY : (*group.try_cget<Collider::InertiaDevMass>(e).value() * tmp[ii].mass));
-            tmp[ii].vel = isStatic ? &temp : &group.get<Rigidbody::Velocity>(e);
-            float& f = group.get<Rigidbody::AngularVelocity>(e);
-            tmp[ii].ang_vel = isStatic ? &temp_f : &f;
-            ii++;
+        auto [idx1, idx2] = col_list[i];
+        auto [bounce, sfric, dfric] = mat_info[i];
+        auto [isStatic1, mass1, vel1, angvel1, inertia1, pos1] = *(react_info.begin() + idx1);
+        auto [isStatic2, mass2, vel2, angvel2, inertia2, pos2] = *(react_info.begin() + idx2);
+        float inv_inertia1 = 1.f / (inertia1 * mass1), inv_inertia2 = 1.f / (inertia2 * mass2);
+        vec2f* vel_ptr1 = &vel1;
+        vec2f* vel_ptr2 = &vel2;
+        float* angvel_ptr1;
+        float* angvel_ptr2;
+        {
+            float& f = angvel1;
+            angvel_ptr1 = &f;
+        }
+        {
+            float& f = angvel2;
+            angvel_ptr2 = &f;
+        }
+        
+        if(isStatic1) {
+            mass1 = INFINITY;
+            inv_inertia1 = 0.f;
+            vel_ptr1 = nullptr;
+            angvel_ptr1 = nullptr;
+        }
+        if(isStatic2) {
+            mass2 = INFINITY;
+            inv_inertia2 = 0.f;
+            vel_ptr2 = nullptr;
+            angvel_ptr2 = nullptr;
         }
         for(const auto& info : col_info[i]) {
-            vec2f rad1, rad2;
-            rad1 = info.contact_point - group.get<Transform::Position>(entity1);
-            rad2 = info.contact_point - group.get<Transform::Position>(entity2);
+            auto rad1 = info.contact_point - pos1;
+            auto rad2 = info.contact_point - pos2;
             
             _solver->processReaction(info.contact_normal, sfric, dfric, bounce, 
-                    tmp[1].inv_inertia, tmp[1].mass, rad1, *tmp[1].vel, *tmp[1].ang_vel, 
-                    tmp[2].inv_inertia, tmp[2].mass, rad2, *tmp[2].vel, *tmp[2].ang_vel);
+                    inv_inertia1, mass1, rad1, vel_ptr1, angvel_ptr1, 
+                    inv_inertia2, mass2, rad2, vel_ptr2, angvel_ptr2);
         }
     }
 }
-void PhysicsManager::processNarrowPhase(CollisionManifoldGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list) const {
-    auto col_infos = detectCollisions(colliding, col_list);
-    solveOverlaps(colliding, col_infos, col_list);
-    processReactions(colliding, col_infos, col_list);
+void PhysicsManager::processNarrowPhase(ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list) const {
+    auto col_infos = detectCollisions(colliding.slice<Collider::ShapeTransformedPartitioned>(), col_list);
+    solveOverlaps(colliding.slice<Rigidbody::isStaticFlag, Transform::Position, Transform::Rotation>(), col_infos, col_list);
+    auto mat_info = calcSelectedMaterial(colliding.slice<Material::Restitution, Material::StaticFric, Material::DynamicFric>(), col_list);
+    processReactions(colliding.slice< Rigidbody::isStaticFlag, Rigidbody::Mass, Rigidbody::Velocity,
+                          Rigidbody::AngularVelocity, Collider::InertiaDevMass, Transform::Position>(), mat_info, col_infos, col_list);
 }
 // void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
 //     if(man.collider->isTrigger)
@@ -268,17 +259,18 @@ void updateTypesFromArgs(Entity owner, Group<GroupTypes...> & group, TupleTypes 
     ((group.template get<TupleTypes>(owner) = tuple), ...);
 }
 
-PhysicsManager::CollisionManifoldGroup PhysicsManager::createCollidingObjectsGroup(Transform::System& trans_sys,
+PhysicsManager::ColCompGroup PhysicsManager::createCollidingObjectsGroup(Transform::System& trans_sys,
                                                                                    Rigidbody::System& rb_sys,
                                                                                    Collider::System& col_sys,
                                                                                    Material::System& mat_sys) const 
 {
-    CollisionManifoldGroup colliding_objects;
+    ColCompGroup colliding_objects;
     for(auto [o] : rb_sys.sliceOwner<>()) {
         auto owner = o;
+        
         auto rb_idx_maybe = rb_sys.sliceAll().getIndex(owner);
-        assert(rb_idx_maybe.has_value());
         size_t rb_idx = rb_idx_maybe.value();
+        
         auto all_tup = *(rb_sys.sliceAll().begin() + static_cast<std::ptrdiff_t>(rb_idx));
         std::apply([&colliding_objects, owner](auto&... values) 
             {
@@ -298,7 +290,7 @@ PhysicsManager::CollisionManifoldGroup PhysicsManager::createCollidingObjectsGro
                 }, all_tup);
         }
     };
-    updateSystem(rb_sys);
+    // updateSystem(rb_sys);
     updateSystem(trans_sys);
     updateSystem(mat_sys);
     updateSystem(col_sys);
@@ -364,7 +356,7 @@ void PhysicsManager::applyAngularVelocityDrag(float delT, Slice<Rigidbody::Angul
             ang_vel -= std::copysign(1.f, ang_vel) * std::clamp(ang_vel * ang_vel * drag, 0.f, abs(ang_vel)) * delT;
     }
 }
-void PhysicsManager::integrate( float delT, CollisionManifoldGroup& group) const {
+void PhysicsManager::integrate( float delT, ColCompGroup& group) const {
     integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::Force, Rigidbody::Velocity>              ());
     integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::AngularForce, Rigidbody::AngularVelocity>());
 
@@ -404,7 +396,7 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
 
     
     auto potential_col_list = processBroadPhase(objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
-    auto col_list = filterBroadPhaseResults(objects, potential_col_list);
+    auto col_list = filterBroadPhaseResults(objects.slice<Rigidbody::isStaticFlag, Collider::Mask, Collider::Tag>(), potential_col_list);
     for (int i = 0; i < steps; i++) {
         integrate(deltaStep, objects);
         

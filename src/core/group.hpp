@@ -48,8 +48,8 @@ class Group {
 public:
     using iterator = RawParallelIterator<Entity, Types...>;
     using const_iterator = RawParallelIterator<const Entity, const Types...>;
-    using reverse_iterator = RawReverseParallelIterator<Entity, Types...>;
-    using const_reverse_iterator = RawReverseParallelIterator<const Entity, const Types...>;
+    // using reverse_iterator = RawReverseParallelIterator<Entity, Types...>;
+    // using const_reverse_iterator = RawReverseParallelIterator<const Entity, const Types...>;
 
     template<class Type>
     void setDefault(const Type& def) {
@@ -81,26 +81,26 @@ public:
             }, m_data); 
     }
     
-    reverse_iterator rbegin() {
-        return std::apply([&](auto&... vecs) {
-                return reverse_iterator(m_entity_ids.data() + m_entity_ids.size() - 1, vecs.data() + vecs.size() - 1 ...);
-            }, m_data); 
-    }
-    reverse_iterator rend() {
-        return std::apply([&](auto&... ves) {
-                return reverse_iterator(m_entity_ids.data() - 1, ves.data() - 1 ...);
-            }, m_data); 
-    }
-    const_reverse_iterator crbegin() const {
-        return std::apply([&](auto&... vecs) {
-                return const_reverse_iterator(m_entity_ids.data() + m_entity_ids.size() - 1, vecs.data() + vecs.size() - 1 ...);
-            }, m_data); 
-    }
-    const_reverse_iterator crend() const {
-        return std::apply([&](auto&... vecs) {
-                return const_reverse_iterator(m_entity_ids.data() - 1, vecs.data() - 1 ...);
-            }, m_data); 
-    }
+    // reverse_iterator rbegin() {
+    //     return std::apply([&](auto&... vecs) {
+    //             return reverse_iterator(m_entity_ids.data() + m_entity_ids.size() - 1, vecs.data() + vecs.size() - 1 ...);
+    //         }, m_data); 
+    // }
+    // reverse_iterator rend() {
+    //     return std::apply([&](auto&... ves) {
+    //             return reverse_iterator(m_entity_ids.data() - 1, ves.data() - 1 ...);
+    //         }, m_data); 
+    // }
+    // const_reverse_iterator crbegin() const {
+    //     return std::apply([&](auto&... vecs) {
+    //             return const_reverse_iterator(m_entity_ids.data() + m_entity_ids.size() - 1, vecs.data() + vecs.size() - 1 ...);
+    //         }, m_data); 
+    // }
+    // const_reverse_iterator crend() const {
+    //     return std::apply([&](auto&... vecs) {
+    //             return const_reverse_iterator(m_entity_ids.data() - 1, vecs.data() - 1 ...);
+    //         }, m_data); 
+    // }
 
 
     bool contains(Entity entity) const {
@@ -210,6 +210,11 @@ public:
     Slice<ExtractedTy...> slice() 
     {
         return Slice<ExtractedTy...>(m_entityToIndex, std::get<std::vector<ExtractedTy>>(m_data)...);
+    }
+    template<class ...ExtractedTy>
+    Slice<const ExtractedTy...> cslice() const 
+    {
+        return Slice<const ExtractedTy...>(m_entityToIndex, std::get<std::vector<ExtractedTy>>(m_data)...);
     }
 };
 }

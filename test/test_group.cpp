@@ -118,32 +118,32 @@ struct global_position : public position {
     }
     
 };
-TEST(group, group_reverse_iterating) {
-    Group<position, global_position, EntityParent> hierarchy;
-    Entity world;
-    Entity player;
-    Entity sword;
-    Entity enemy1;
-    Entity enemy2;
-    hierarchy.push_back(enemy2, {-100, 0}, {}, {world});
-    hierarchy.push_back(sword, {50, 50}, {}, {player});
-    hierarchy.push_back(enemy1, {200, 100}, {}, {world});
-    hierarchy.push_back(player, {100, 0}, {}, {world});
-    hierarchy.push_back(world, {100, 100}, {}, EntityParent());
-    for(auto it = hierarchy.rbegin(); it != hierarchy.rend(); it++) {
-        auto [entity, pos, gpos, parent] = *it;
-        if(parent.val == EntityParent::null) {
-            gpos = pos;
-            continue;
-        }
-        auto parents_position = hierarchy.try_get<global_position>(parent.val);
-        ASSERT_TRUE(parents_position.has_value());
-        gpos = {parents_position.value()->x + pos.x, parents_position.value()->y + pos.y};
-    }
-    auto sword_pos = hierarchy.try_get<global_position>(sword).value();
-    ASSERT_EQ(sword_pos->x, 50 + 100 + 100);
-    ASSERT_EQ(sword_pos->y, 50 + 100);
-}
+// TEST(group, group_reverse_iterating) {
+//     Group<position, global_position, EntityParent> hierarchy;
+//     Entity world;
+//     Entity player;
+//     Entity sword;
+//     Entity enemy1;
+//     Entity enemy2;
+//     hierarchy.push_back(enemy2, {-100, 0}, {}, {world});
+//     hierarchy.push_back(sword, {50, 50}, {}, {player});
+//     hierarchy.push_back(enemy1, {200, 100}, {}, {world});
+//     hierarchy.push_back(player, {100, 0}, {}, {world});
+//     hierarchy.push_back(world, {100, 100}, {}, EntityParent());
+//     for(auto it = hierarchy.rbegin(); it != hierarchy.rend(); it++) {
+//         auto [entity, pos, gpos, parent] = *it;
+//         if(parent.val == EntityParent::null) {
+//             gpos = pos;
+//             continue;
+//         }
+//         auto parents_position = hierarchy.try_get<global_position>(parent.val);
+//         ASSERT_TRUE(parents_position.has_value());
+//         gpos = {parents_position.value()->x + pos.x, parents_position.value()->y + pos.y};
+//     }
+//     auto sword_pos = hierarchy.try_get<global_position>(sword).value();
+//     ASSERT_EQ(sword_pos->x, 50 + 100 + 100);
+//     ASSERT_EQ(sword_pos->y, 50 + 100);
+// }
 TEST(group, owner_slice) {
     Group<position> transforms;
     Entity entities[4];

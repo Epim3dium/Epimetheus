@@ -20,6 +20,7 @@ private:
     typedef RawParallelIterator<Types...> IteratorType;
 protected:
     pointer m_ptr;
+    std::ptrdiff_t m_pos = 0;
 public:
     RawParallelIterator() : m_ptr({(Types*)nullptr}...){} 
     RawParallelIterator(Types*... pointers) : m_ptr({pointers}...) {} 
@@ -27,39 +28,29 @@ public:
     RawParallelIterator(const IteratorType&) = default;
     RawParallelIterator<Types...>& operator=(const IteratorType&) = default;
 
-    operator bool() const {
-        if(std::get<0U>(m_ptr)) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
     bool operator==(const IteratorType& other) const{
-        return m_ptr == other.m_ptr;
+        return std::apply([&](auto&... myTuplePtr) 
+            {
+                return std::apply([&](auto&... OtherTuplePtr) 
+                {
+                    bool result = ((myTuplePtr + m_pos == OtherTuplePtr + other.m_pos) && ...);
+                    return result;
+                }, other.m_ptr);
+            }, m_ptr);
     }
     bool operator!=(const IteratorType& other) const {
-        return m_ptr != other.m_ptr;
+        return !operator==(other);
     }
     IteratorType& operator+=(const difference_type& movement) {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr += movement), ...);
-            }, m_ptr);
+        m_pos += movement;
         return *this;
     }
     IteratorType& operator-=(const difference_type& movement) {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr -= movement), ...);
-            }, m_ptr);
+        m_pos -= movement;
         return *this;
     }
     IteratorType& operator++() {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr++), ...);
-            }, m_ptr);
+        m_pos++;
         return *this;
     }
     IteratorType operator++(int) {
@@ -73,47 +64,38 @@ public:
         return temp;
     }
     IteratorType& operator--() {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr--), ...);
-            }, m_ptr);
+        m_pos--;
         return *this;
     }
     IteratorType operator-(const difference_type& movement) const {
         auto temp = *this;
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr -= movement), ...);
-            }, temp.m_ptr);
+        temp.m_pos -= movement;
         return temp;
     }
     IteratorType operator+(const difference_type& movement) const {
         auto temp = *this;
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr += movement), ...);
-            }, temp.m_ptr);
+        temp.m_pos += movement;
         return temp;
     }
     difference_type operator-(const IteratorType& other) const {
-        return std::distance(std::get<0U>(other.m_ptr), std::get<0U>(m_ptr) );
+        return m_pos - other.m_pos;
     }
 
     reference operator*(){
         return std::apply([&](auto&... tuplePtr) 
             {
-                reference result = {*tuplePtr...};
+                reference result = {tuplePtr[m_pos]...};
                 return result;
             }, m_ptr);
     }
     const_reference operator*() const {
         return std::apply([&](auto&... tuplePtr) 
             {
-                const_reference result = {*tuplePtr...};
+                const_reference result = {tuplePtr[m_pos]...};
                 return result;
             }, m_ptr);
     }
-    pointer operator->(){return m_ptr;}
+    pointer operator->(){return m_ptr[m_pos];}
 };
 template <typename... Types>
 class RawReverseParallelIterator : public RawParallelIterator<Types...> {
@@ -130,31 +112,16 @@ public:
     //IteratorType&           operator=(const BaseType& rawIterator){this->m_ptr = rawIterator.getPtr();return (*this);}
     //IteratorType&           operator=(Types*){this->setPtr(ptr);return (*this);}
 
-    bool operator==(const IteratorType& other) const{
-        return this->m_ptr == other.m_ptr;
-    }
-    bool operator!=(const IteratorType& other) const {
-        return this->m_ptr != other.m_ptr;
-    }
     IteratorType& operator+=(const difference_type& movement) {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr -= movement), ...);
-            }, this->m_ptr);
+        this->m_pos -= movement;
         return *this;
     }
     IteratorType& operator-=(const difference_type& movement) {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr += movement), ...);
-            }, this->m_ptr);
+        this->m_pos += movement;
         return *this;
     }
     IteratorType& operator++() {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr--), ...);
-            }, this->m_ptr);
+        this->m_pos --;
         return *this;
     }
     IteratorType operator++(int) {
@@ -168,26 +135,17 @@ public:
         return temp;
     }
     IteratorType& operator--() {
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr++), ...);
-            }, this->m_ptr);
+        this->m_pos++;
         return *this;
     }
     IteratorType operator-(const difference_type& movement) const {
         auto temp = *this;
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr += movement), ...);
-            }, temp.m_ptr);
+        temp -= movement;
         return temp;
     }
     IteratorType operator+(const difference_type& movement) const {
         auto temp = *this;
-        std::apply([&](auto&... tuplePtr) 
-            {
-                ((tuplePtr -= movement), ...);
-            }, temp.m_ptr);
+        temp += movement;
         return temp;
     }
     difference_type operator-(const IteratorType& other) const {

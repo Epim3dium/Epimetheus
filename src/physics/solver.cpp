@@ -1,6 +1,7 @@
 #include "solver.hpp"
 #include "collider.hpp"
 #include "rigidbody.hpp"
+#include "debug/log.hpp"
 
 #include <algorithm>
 #include <exception>
@@ -21,9 +22,14 @@ CollisionInfo detectOverlap(const ConvexPolygon& p1, const ConvexPolygon& p2) {
     return {false};
 }
 void DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bounce, 
-        float inv_inertia1, float mass1, vec2f rad1, vec2f& vel1, float& ang_vel1,
-        float inv_inertia2, float mass2, vec2f rad2, vec2f& vel2, float& ang_vel2) {
+        float inv_inertia1, float mass1, vec2f rad1, vec2f* vel1_ptr, float* ang_vel1_ptr,
+        float inv_inertia2, float mass2, vec2f rad2, vec2f* vel2_ptr, float* ang_vel2_ptr) {
 
+    auto vel1 = (vel1_ptr == nullptr ? vec2f(0, 0) : *vel1_ptr);
+    auto ang_vel1 = (ang_vel1_ptr == nullptr ? 0.f : *ang_vel1_ptr);
+    auto vel2 = (vel2_ptr == nullptr ? vec2f(0, 0) : *vel2_ptr);
+    auto ang_vel2 = (ang_vel2_ptr == nullptr ? 0.f : *ang_vel2_ptr);
+    
     vec2f impulse (0, 0);
 
     vec2f rad1perp(-rad1.y, rad1.x);
@@ -42,10 +48,19 @@ void DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bo
     vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
     impulse += cn * j - fj;
 
-    vel1 -= impulse / mass1;
-    ang_vel1 += cross(impulse, rad1) * inv_inertia1;
-    vel2 += impulse / mass2;
-    ang_vel2 -= cross(impulse, rad2) * inv_inertia2;
+    if(vel1_ptr){
+        *vel1_ptr -= impulse / mass1;
+    }
+    if(ang_vel1_ptr) {
+        *ang_vel1_ptr += cross(impulse, rad1) * inv_inertia1;
+    }
+    
+    if(vel2_ptr){
+        *vel2_ptr += impulse / mass2;
+    }
+    if(ang_vel2_ptr){
+        *ang_vel2_ptr -= cross(impulse, rad2) * inv_inertia2;
+    }
 }
 float DefaultSolver::getReactImpulse(const vec2f& rad1perp, float p1inv_inertia, float mass1, const vec2f& rad2perp, float p2inv_inertia, float mass2, 
         float restitution, const vec2f& rel_vel, vec2f cn) {
