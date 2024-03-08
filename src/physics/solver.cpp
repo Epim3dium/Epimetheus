@@ -14,21 +14,21 @@
 
 namespace epi {
 
-CollisionInfo detectOverlap(const ConvexPolygon& p1, const ConvexPolygon& p2) {
+CollisionInfo detectOverlap(const std::vector<vec2f>& p1, const std::vector<vec2f>& p2) {
     auto intersection = intersectPolygonPolygon(p1, p2);
     if(intersection.detected) {
+        // auto cps = findContactPoints(ConvexPolygon::CreateFromPoints(p1), ConvexPolygon::CreateFromPoints(p2));
+        // if(cps.size() == 0)
+        //     return {false};
+        // auto cp = std::reduce(cps.begin(), cps.end()) / static_cast<float>(cps.size());
         return {true, intersection.contact_normal, intersection.cp, intersection.overlap};
     }
     return {false};
 }
-void DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bounce, 
-        float inv_inertia1, float mass1, vec2f rad1, vec2f* vel1_ptr, float* ang_vel1_ptr,
-        float inv_inertia2, float mass2, vec2f rad2, vec2f* vel2_ptr, float* ang_vel2_ptr) {
+DefaultSolver::ReactionResponse DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bounce, 
+        float inv_inertia1, float mass1, vec2f rad1, vec2f vel1, float ang_vel1,
+        float inv_inertia2, float mass2, vec2f rad2, vec2f vel2, float ang_vel2) {
 
-    auto vel1 = (vel1_ptr == nullptr ? vec2f(0, 0) : *vel1_ptr);
-    auto ang_vel1 = (ang_vel1_ptr == nullptr ? 0.f : *ang_vel1_ptr);
-    auto vel2 = (vel2_ptr == nullptr ? vec2f(0, 0) : *vel2_ptr);
-    auto ang_vel2 = (ang_vel2_ptr == nullptr ? 0.f : *ang_vel2_ptr);
     
     vec2f impulse (0, 0);
 
@@ -48,19 +48,13 @@ void DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bo
     vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
     impulse += cn * j - fj;
 
-    if(vel1_ptr){
-        *vel1_ptr -= impulse / mass1;
-    }
-    if(ang_vel1_ptr) {
-        *ang_vel1_ptr += cross(impulse, rad1) * inv_inertia1;
-    }
+    ReactionResponse result;
+    result.vel_change1 = -impulse / mass1;
+    result.angvel_change1 = cross(impulse, rad1) * inv_inertia1;
     
-    if(vel2_ptr){
-        *vel2_ptr += impulse / mass2;
-    }
-    if(ang_vel2_ptr){
-        *ang_vel2_ptr -= cross(impulse, rad2) * inv_inertia2;
-    }
+    result.vel_change2 = impulse / mass2;
+    result.angvel_change2 = -cross(impulse, rad2) * inv_inertia2;
+    return result;
 }
 float DefaultSolver::getReactImpulse(const vec2f& rad1perp, float p1inv_inertia, float mass1, const vec2f& rad2perp, float p2inv_inertia, float mass2, 
         float restitution, const vec2f& rel_vel, vec2f cn) {
@@ -115,28 +109,27 @@ std::vector<CollisionInfo> DefaultSolver::detect(const Collider::ShapeTransforme
             auto aabb2 = AABB::CreateFromVerticies(poly2);
             if(!isOverlappingAABBAABB(aabb1, aabb2))
                 continue;
-            result.push_back(detectOverlap(ConvexPolygon::CreateFromPoints(poly1), ConvexPolygon::CreateFromPoints(poly2)));
+            result.push_back(detectOverlap(poly1, poly2));
         }
     }
     return result; 
 }
-void DefaultSolver::solveOverlap(CollisionInfo info, 
-        bool isStatic1, vec2f& pos1, float& rot1, 
-        bool isStatic2, vec2f& pos2, float& rot2) 
+std::pair<vec2f, vec2f> DefaultSolver::solveOverlap(const CollisionInfo& info, 
+        bool isStatic1, vec2f pos1, 
+        bool isStatic2, vec2f pos2) 
 {
     if(!info.detected)
-        return;
+        return {};
 
     constexpr float response_coef = 0.9f;
     const float offset = info.overlap * response_coef;
 
     if(isStatic2) {
-        pos1 += info.contact_normal * offset;
+        return {info.contact_normal * offset, vec2f(0, 0)};
     } else if(isStatic1) {
-        pos2 -= info.contact_normal * offset;
+        return {vec2f(0, 0), -info.contact_normal * offset};
     } else {
-        pos1 += info.contact_normal * offset * 0.5f;
-        pos2 -= info.contact_normal * offset * 0.5f;
+        return {info.contact_normal * offset * 0.5f, -info.contact_normal * offset * 0.5f}; 
     }
 }
 // void DefaultSolver::solve(CollisionInfo man, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction)  {

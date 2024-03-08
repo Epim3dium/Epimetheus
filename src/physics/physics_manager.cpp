@@ -24,7 +24,6 @@
 #include <mutex>
 
 namespace epi {
-using std::mt19937;
 
 //from 1 to n
 //veci communities(n + 1, -1);
@@ -61,7 +60,7 @@ static bool areCompatible(const Collider::Mask& mask1, const Collider::Tag& tag1
         (mask1.size() == 0 || tag2 ^ mask1);
 }
 std::vector<PhysicsManager::ColParticipants> PhysicsManager::processBroadPhase(
-    OwnerSlice<Collider::ShapeTransformedPartitioned> slice) const 
+    OwnerSlice<ShapeTransformedPartitioned> slice) const 
 {
     std::vector<PhysicsManager::ColParticipants> result;
     struct SwipeeInformation {
@@ -116,7 +115,7 @@ std::vector<PhysicsManager::ColParticipants> PhysicsManager::processBroadPhase(
     return result;
 }
 std::vector<PhysicsManager::ColParticipants>
-PhysicsManager::filterBroadPhaseResults(Slice<Rigidbody::isStaticFlag, Collider::Mask, Collider::Tag> comp_info,
+PhysicsManager::filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info,
                                         const std::vector<ColParticipants> broad_result) const {
     std::vector<PhysicsManager::ColParticipants> compatible_collisions;
     compatible_collisions.reserve(broad_result.size());
@@ -131,7 +130,7 @@ PhysicsManager::filterBroadPhaseResults(Slice<Rigidbody::isStaticFlag, Collider:
     }
     return compatible_collisions;
 }
-std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<Collider::ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
+std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
     std::vector<std::vector<CollisionInfo>> result;
     result.reserve(col_list.size());
     for(auto [idx1, idx2] : col_list) {
@@ -142,18 +141,28 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<C
     }
     return result;
 }
-void PhysicsManager::solveOverlaps(Slice<Rigidbody::isStaticFlag, Transform::Position, Transform::Rotation> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const {
+void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
+                                   const std::vector<std::vector<CollisionInfo>>& col_info,
+                                   const std::vector<ColParticipants>& col_list,
+                                   std::vector<float>& pressure_list) const 
+{
     assert(col_list.size() == col_info.size());
     for(int i = 0; i < col_list.size(); i++) {
         auto [idx1, idx2] = col_list[i];
-        auto [isStatic1, pos1, rot1] = *(shape_info.begin() + idx1);
-        auto [isStatic2, pos2, rot2] = *(shape_info.begin() + idx2);
+        
+        float pressure1 = pressure_list[idx1];
+        float pressure2 = pressure_list[idx2];
+        
+        auto [isStatic1, pos1] = *(shape_info.begin() + idx1);
+        auto [isStatic2, pos2] = *(shape_info.begin() + idx2);
         for(const auto& info : col_info[i]) {
-            _solver->solveOverlap(info, isStatic1, pos1, rot1, isStatic2, pos2, rot2);
+            auto [off1, off2] = _solver->solveOverlap(info, isStatic1, pos1, isStatic2, pos2);
+            pos1 += off1 * (pressure2 / (pressure1 + pressure2));
+            pos2 += off2 * (pressure1 / (pressure1 + pressure2));
         }
     }
 }
-std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(Slice<Material::Restitution, Material::StaticFric, Material::DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const {
+std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const {
     std::vector<MaterialTuple> selected_properties;
     for(auto [idx1, idx2] : col_part) {
         auto [bounce1, sfric1, dfric1] = *(mat_info.begin() + idx1);
@@ -166,8 +175,8 @@ std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(
     }
     return selected_properties;
 }
-void PhysicsManager::processReactions(Slice < Rigidbody::isStaticFlag, Rigidbody::Mass, Rigidbody::Velocity,
-                      Rigidbody::AngularVelocity, Collider::InertiaDevMass, Transform::Position> react_info,
+void PhysicsManager::processReactions(Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
+                      AngularVelocity, InertiaDevMass, Position> react_info,
                       const std::vector<MaterialTuple>& mat_info,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
                       const std::vector<ColParticipants>& col_list) const 
@@ -177,50 +186,70 @@ void PhysicsManager::processReactions(Slice < Rigidbody::isStaticFlag, Rigidbody
     for(int i = 0; i < col_list.size(); i++) {
         auto [idx1, idx2] = col_list[i];
         auto [bounce, sfric, dfric] = mat_info[i];
-        auto [isStatic1, mass1, vel1, angvel1, inertia1, pos1] = *(react_info.begin() + idx1);
-        auto [isStatic2, mass2, vel2, angvel2, inertia2, pos2] = *(react_info.begin() + idx2);
-        float inv_inertia1 = 1.f / (inertia1 * mass1), inv_inertia2 = 1.f / (inertia2 * mass2);
-        vec2f* vel_ptr1 = &vel1;
-        vec2f* vel_ptr2 = &vel2;
-        float* angvel_ptr1;
-        float* angvel_ptr2;
-        {
-            float& f = angvel1;
-            angvel_ptr1 = &f;
-        }
-        {
-            float& f = angvel2;
-            angvel_ptr2 = &f;
-        }
+        auto [isStatic1, lockRot1, mass1, vel1, angvel1, inertia1, pos1] = *(react_info.begin() + idx1);
+        auto [isStatic2, lockRot2, mass2, vel2, angvel2, inertia2, pos2] = *(react_info.begin() + idx2);
+        float inv_inertia1 = 1.f / (inertia1 * mass1);
+        float inv_inertia2 = 1.f / (inertia2 * mass2);
         
         if(isStatic1) {
             mass1 = INFINITY;
             inv_inertia1 = 0.f;
-            vel_ptr1 = nullptr;
-            angvel_ptr1 = nullptr;
+            vel1 = vec2f(0, 0);
+            angvel1 = 0.f;
+        }
+        if(lockRot1) {
+            inv_inertia1 = 0.f;
         }
         if(isStatic2) {
             mass2 = INFINITY;
             inv_inertia2 = 0.f;
-            vel_ptr2 = nullptr;
-            angvel_ptr2 = nullptr;
+            vel2 = vec2f(0, 0);
+            angvel2 = 0.f;
         }
+        if(lockRot2) {
+            inv_inertia2 = 0.f;
+        }
+        
         for(const auto& info : col_info[i]) {
             auto rad1 = info.contact_point - pos1;
             auto rad2 = info.contact_point - pos2;
             
-            _solver->processReaction(info.contact_normal, sfric, dfric, bounce, 
-                    inv_inertia1, mass1, rad1, vel_ptr1, angvel_ptr1, 
-                    inv_inertia2, mass2, rad2, vel_ptr2, angvel_ptr2);
+            auto reaction = _solver->processReaction(info.contact_normal, sfric, dfric, bounce, 
+                    inv_inertia1, mass1, rad1, vel1, angvel1, 
+                    inv_inertia2, mass2, rad2, vel2, angvel2);
+            
+            if(!isStatic1) {
+                vel1 += reaction.vel_change1;
+                if(!lockRot1) {
+                    angvel1 += reaction.angvel_change1;
+                }
+            }
+            if(!isStatic2) {
+                vel2 += reaction.vel_change2;
+                if(!lockRot2) {
+                    angvel2 += reaction.angvel_change2;
+                }
+            }
         }
     }
 }
-void PhysicsManager::processNarrowPhase(ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list) const {
-    auto col_infos = detectCollisions(colliding.slice<Collider::ShapeTransformedPartitioned>(), col_list);
-    solveOverlaps(colliding.slice<Rigidbody::isStaticFlag, Transform::Position, Transform::Rotation>(), col_infos, col_list);
-    auto mat_info = calcSelectedMaterial(colliding.slice<Material::Restitution, Material::StaticFric, Material::DynamicFric>(), col_list);
-    processReactions(colliding.slice< Rigidbody::isStaticFlag, Rigidbody::Mass, Rigidbody::Velocity,
-                          Rigidbody::AngularVelocity, Collider::InertiaDevMass, Transform::Position>(), mat_info, col_infos, col_list);
+void PhysicsManager::processNarrowPhase(ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list, std::vector<float>& pressure_list) const {
+    auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), col_list);
+    
+    solveOverlaps(colliding.slice<isStaticFlag, Position>(), col_infos, col_list, pressure_list);
+    for(int i = 0; i < col_infos.size(); i++) {
+        for(auto info : col_infos[i]) {
+            if(!info.detected) {
+                continue;
+            }
+            auto [idx1, idx2] = col_list[i];
+            pressure_list[idx1] += info.overlap;
+            pressure_list[idx2] += info.overlap;
+        }
+    }
+    auto mat_info = calcSelectedMaterial(colliding.slice<Restitution, StaticFric, DynamicFric>(), col_list);
+    processReactions(colliding.slice< isStaticFlag, lockRotationFlag, Mass, Velocity,
+                          AngularVelocity, InertiaDevMass, Position>(), mat_info, col_infos, col_list);
 }
 // void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
 //     if(man.collider->isTrigger)
@@ -297,27 +326,9 @@ PhysicsManager::ColCompGroup PhysicsManager::createCollidingObjectsGroup(Transfo
     return colliding_objects;
 }
 
-void PhysicsManager::resetNonMovingObjects(
-    Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force, Rigidbody::AngularForce,
-          Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>
-        slice) const 
-{
-    for(auto [vel, ang_vel, force, ang_force, is_static, lock_rot] : slice) {
-        if(is_static) {
-            vel = vec2f(0.f, 0.f);
-            force = vec2f(0.f, 0.f);
-            ang_vel = 0.f;
-            ang_force = 0.f;
-        }
-        if(lock_rot) {
-            ang_vel = 0.f;
-            ang_force = 0.f;
-        }
-    }
-}
 
 void PhysicsManager::copyResultingVelocities(
-    OwnerSlice<Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice,
+    OwnerSlice<Velocity, AngularVelocity> result_slice,
     Rigidbody::System& rb_sys) const 
 {
     for(auto [owner, vel, ang_vel] : result_slice) {
@@ -333,7 +344,7 @@ void PhysicsManager::copyResultingVelocities(
         ang_force = 0.f;
     }
 }
-void PhysicsManager::copyResultingTransforms(OwnerSlice<Transform::Position, Transform::Rotation> result_slice,
+void PhysicsManager::copyResultingTransforms(OwnerSlice<Position, Rotation> result_slice,
                                              Transform::System& trans_sys) const {
     for(auto [owner, pos, rot] : result_slice) {
         //removed when processing collisions
@@ -344,41 +355,42 @@ void PhysicsManager::copyResultingTransforms(OwnerSlice<Transform::Position, Tra
         (trans_sys.get<Transform::Rotation>(owner)) = rot;
     }
 }
-void PhysicsManager::applyVelocityDrag       (float delT, Slice<Rigidbody::Velocity, Material::AirDrag> slice) const  {
+void PhysicsManager::applyVelocityDrag       (float delT, Slice<Velocity, AirDrag> slice) const  {
     for(auto [vel, drag] : slice) {
         if(!nearlyEqual(qlen(vel), 0.f))
             vel -= normal(vel) * std::clamp(qlen(vel) * drag, 0.f, length(vel)) * delT;
     }
 }
-void PhysicsManager::applyAngularVelocityDrag(float delT, Slice<Rigidbody::AngularVelocity, Material::AirDrag> slice) const {
+void PhysicsManager::applyAngularVelocityDrag(float delT, Slice<AngularVelocity, AirDrag> slice) const {
     for(auto [ang_vel, drag] : slice) {
         if(!nearlyEqual(ang_vel, 0.f))
             ang_vel -= std::copysign(1.f, ang_vel) * std::clamp(ang_vel * ang_vel * drag, 0.f, abs(ang_vel)) * delT;
     }
 }
 void PhysicsManager::integrate( float delT, ColCompGroup& group) const {
-    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::Force, Rigidbody::Velocity>              ());
-    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::AngularForce, Rigidbody::AngularVelocity>());
+    integrateAny            (delT, group.slice  <isStaticFlag, Force, Velocity>              ());
+    integrateAny            (delT, group.slice  <isStaticFlag, AngularForce, AngularVelocity>());
 
-    applyVelocityDrag       (delT, group.slice<Rigidbody::Velocity, Material::AirDrag>             ());
-    applyAngularVelocityDrag(delT, group.slice<Rigidbody::AngularVelocity, Material::AirDrag>      ());
+    applyVelocityDrag       (delT, group.slice<Velocity, AirDrag>                            ());
+    applyAngularVelocityDrag(delT, group.slice<AngularVelocity, AirDrag>                     ());
     
-    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::Velocity, Transform::Position>           ());
-    integrateAny          (delT, group.slice  <Rigidbody::isStaticFlag, Rigidbody::AngularVelocity, Transform::Rotation>    ());
+    integrateAny            (delT, group.slice  <isStaticFlag, Velocity, Position>           ());
+    integrateAny            (delT, group.slice  <isStaticFlag, AngularVelocity, Rotation>    ());
     for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
         static constexpr float gravity = 1000.f;
         vel.y += delT * gravity;
     }
 }
-void PhysicsManager::rollbackGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const {
+void PhysicsManager::rollbackGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const {
     for(auto [g, l] : slice)
         g.combine(l.getInverse());
 }
-void PhysicsManager::updateGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const {
+void PhysicsManager::updateGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const {
     for(auto [g, l] : slice)
         g.combine(l);
 }
 
+#define VERY_SMALL_NUMBER (0.0000000001f)
 void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
             Collider::System& col_sys, Material::System& mat_sys,
             float delT) const 
@@ -386,33 +398,32 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     float deltaStep = delT / (float)steps;
     auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
     
-    resetNonMovingObjects( objects.slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
-                                Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag>());
     
-    Collider::calcParitionedShapes(objects.slice<Collider::ShapeModel, Collider::ShapePartitioned>());
+    Collider::calcParitionedShapes(objects.slice<ShapeModel, ShapePartitioned>());
     Collider::updatePartitionedTransformedShapes(
-        objects.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
-        objects.slice<Transform::GlobalTransform>());
+        objects.sliceOwner<ShapePartitioned, ShapeTransformedPartitioned>(),
+        objects.slice<GlobalTransform>());
 
     
-    auto potential_col_list = processBroadPhase(objects.sliceOwner<Collider::ShapeTransformedPartitioned>());
-    auto col_list = filterBroadPhaseResults(objects.slice<Rigidbody::isStaticFlag, Collider::Mask, Collider::Tag>(), potential_col_list);
+    auto potential_col_list = processBroadPhase(objects.sliceOwner<ShapeTransformedPartitioned>());
+    auto col_list = filterBroadPhaseResults(objects.slice<isStaticFlag, Mask, Tag>(), potential_col_list);
+    std::vector<float> pressure_list(objects.size(), VERY_SMALL_NUMBER);
     for (int i = 0; i < steps; i++) {
         integrate(deltaStep, objects);
         
-        rollbackGlobalTransform         (objects.slice<Transform::GlobalTransform, Transform::LocalTransform>                                ());
-        Transform::updateLocalTransforms(objects.slice<Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform>());
-        updateGlobalTransform           (objects.slice<Transform::GlobalTransform, Transform::LocalTransform>                                ());
+        rollbackGlobalTransform         (objects.slice<GlobalTransform, LocalTransform>                                ());
+        Transform::updateLocalTransforms(objects.slice<Position, Rotation, Scale, LocalTransform>());
+        updateGlobalTransform           (objects.slice<GlobalTransform, LocalTransform>                                ());
         
         Collider::updatePartitionedTransformedShapes(
-                objects.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
-                objects.slice<Transform::GlobalTransform>());
+                objects.sliceOwner<ShapePartitioned, ShapeTransformedPartitioned>(),
+                objects.slice<GlobalTransform>());
         
         
-        processNarrowPhase(objects, col_list);
+        processNarrowPhase(objects, col_list, pressure_list);
     }
-    copyResultingTransforms(objects.sliceOwner<Transform::Position, Transform::Rotation>(), trans_sys);
-    copyResultingVelocities(objects.sliceOwner<Rigidbody::Velocity, Rigidbody::AngularVelocity>(), rb_sys);
+    copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
+    copyResultingVelocities(objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
     // processSleeping();
 }
 

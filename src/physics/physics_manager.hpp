@@ -23,11 +23,34 @@ public:
     enum class eSelectMode { Min, Max, Avg };
 
 private:
+    typedef Collider::ShapeTransformedPartitioned ShapeTransformedPartitioned;
+    typedef Transform::GlobalTransform            GlobalTransform;
+    typedef Rigidbody::Mass                       Mass;
+    typedef Material::Restitution                 Restitution;
+    typedef Collider::ShapePartitioned            ShapePartitioned;
+    typedef Collider::Mask                        Mask;
+    typedef Collider::Tag                         Tag;
+    typedef Collider::InertiaDevMass              InertiaDevMass;
+    typedef Collider::ShapeModel                  ShapeModel;
+    typedef Collider::isTriggerFlag               isTriggerFlag;
+    typedef Material::DynamicFric                 DynamicFric;
+    typedef Material::StaticFric                  StaticFric;
+    typedef Material::AirDrag                     AirDrag;
+    typedef Rigidbody::AngularVelocity            AngularVelocity;
+    typedef Rigidbody::AngularForce               AngularForce;
+    typedef Rigidbody::Velocity                   Velocity;
+    typedef Rigidbody::Force                      Force;
+    typedef Rigidbody::lockRotationFlag           lockRotationFlag;
+    typedef Rigidbody::isStaticFlag               isStaticFlag;
+    typedef Transform::LocalTransform             LocalTransform;
+    typedef Transform::Scale                      Scale;
+    typedef Transform::Rotation                   Rotation;
+    typedef Transform::Position                   Position;
     typedef Group<
-        Transform::Position, Transform::Rotation, Transform::Scale, Transform::LocalTransform, Transform::GlobalTransform,
-        Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag, Rigidbody::Force, Rigidbody::Velocity, Rigidbody::AngularForce, Rigidbody::AngularVelocity, Rigidbody::Mass,
-        Material::AirDrag, Material::StaticFric, Material::DynamicFric, Material::Restitution,
-        Collider::isTriggerFlag, Collider::ShapeModel, Collider::InertiaDevMass, Collider::Tag, Collider::Mask, Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>
+        Position, Rotation, Scale, LocalTransform, GlobalTransform,
+        isStaticFlag, lockRotationFlag, Force, Velocity, AngularForce, AngularVelocity, Mass,
+        AirDrag, StaticFric, DynamicFric, Restitution,
+        isTriggerFlag, ShapeModel, InertiaDevMass, Tag, Mask, ShapePartitioned, ShapeTransformedPartitioned>
             ColCompGroup;
     template<class T>
     static T selectFrom(T a, T b, eSelectMode mode) {
@@ -42,35 +65,33 @@ private:
     std::unique_ptr<SolverInterface> _solver =
         std::make_unique<DefaultSolver>();
 
-    std::vector<ColParticipants> processBroadPhase(OwnerSlice<Collider::ShapeTransformedPartitioned> slice) const;
-    std::vector<ColParticipants> filterBroadPhaseResults(Slice<Rigidbody::isStaticFlag, Collider::Mask, Collider::Tag> comp_info, const std::vector<ColParticipants> broad_result) const;
+    std::vector<ColParticipants> processBroadPhase(OwnerSlice<ShapeTransformedPartitioned> slice) const;
+    std::vector<ColParticipants> filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info, const std::vector<ColParticipants> broad_result) const;
     
     struct MaterialTuple {
         float bounce;
         float sfric;
         float dfric;
     };
-    std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<Collider::ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const;
-    void solveOverlaps(Slice<Rigidbody::isStaticFlag, Transform::Position, Transform::Rotation> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list) const;
-    std::vector<MaterialTuple> calcSelectedMaterial(Slice<Material::Restitution, Material::StaticFric, Material::DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const;
-    void processReactions(Slice < Rigidbody::isStaticFlag, Rigidbody::Mass, Rigidbody::Velocity,
-                          Rigidbody::AngularVelocity, Collider::InertiaDevMass, Transform::Position> react_info,
-                          const std::vector<MaterialTuple>& mat_info,
-                          const std::vector<std::vector<CollisionInfo>>& col_info,
-                          const std::vector<ColParticipants>& col_list) const;
+    std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const;
+    void solveOverlaps(Slice<isStaticFlag, Position> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list, std::vector<float>& pressures) const;
+    std::vector<MaterialTuple> calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const;
+    void processReactions(Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
+                      AngularVelocity, InertiaDevMass, Position> react_info,
+                      const std::vector<MaterialTuple>& mat_info,
+                      const std::vector<std::vector<CollisionInfo>>& col_info,
+                      const std::vector<ColParticipants>& col_list) const; 
     //V
-    void processNarrowPhase(ColCompGroup& colliding, const std::vector<ColParticipants>& col_info) const;
+    void processNarrowPhase(ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list) const;
     
-    void resetNonMovingObjects(Slice<Rigidbody::Velocity, Rigidbody::AngularVelocity, Rigidbody::Force,
-         Rigidbody::AngularForce, Rigidbody::isStaticFlag, Rigidbody::lockRotationFlag> slice) const;
-    void copyResultingVelocities(OwnerSlice<Rigidbody::Velocity, Rigidbody::AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
-    void copyResultingTransforms(OwnerSlice<Transform::Position, Transform::Rotation> result_slice, Transform::System& trans_sys) const; 
+    void copyResultingVelocities(OwnerSlice<Velocity, AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
+    void copyResultingTransforms(OwnerSlice<Position, Rotation> result_slice, Transform::System& trans_sys) const; 
 
     //group contains only objects that can collide and react to collisions
     ColCompGroup createCollidingObjectsGroup(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                                                        Collider::System& col_sys, Material::System& mat_sys) const;
     template<class IntegratorT, class IntegrateeT>
-    void integrateAny(float delT, Slice<Rigidbody::isStaticFlag, IntegratorT, IntegrateeT> slice) const {
+    void integrateAny(float delT, Slice<isStaticFlag, IntegratorT, IntegrateeT> slice) const {
         for(auto [isStatic, a, b] : slice) {
             if(!isStatic)
                 b += a * delT;
@@ -82,13 +103,13 @@ private:
     // void integrateVelocity       (float delT, Slice<Rigidbody::Velocity, Transform::Position> slice) const;
     // void integrateAngularVelocity(float delT, Slice<Rigidbody::AngularVelocity, Transform::Rotation> slice) const;
 
-    void applyVelocityDrag       (float delT, Slice<Rigidbody::Velocity, Material::AirDrag> slice) const;
-    void applyAngularVelocityDrag(float delT, Slice<Rigidbody::AngularVelocity, Material::AirDrag> slice) const;
+    void applyVelocityDrag       (float delT, Slice<Velocity, AirDrag> slice) const;
+    void applyAngularVelocityDrag(float delT, Slice<AngularVelocity, AirDrag> slice) const;
 
     void integrate(float delT, ColCompGroup& group) const;
     
-    void rollbackGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const;
-    void updateGlobalTransform(Slice<Transform::GlobalTransform, Transform::LocalTransform> slice) const;
+    void rollbackGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const;
+    void updateGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const;
 
 public :
     // number of physics/collision steps per frame
