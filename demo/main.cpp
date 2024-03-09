@@ -98,6 +98,51 @@ struct System {
         transforms.push_back(world, Position{}, Rotation{0.f});
     }
 };
+#include "imgui.h" // necessary for ImGui::*, imgui-SFML.h doesn't include imgui.h
+
+#include "imgui-SFML.h" // for ImGui::SFML::* functions and SFML-specific overloads
+
+#include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/System/Clock.hpp>
+#include <SFML/Window/Event.hpp>
+
+int not_main() {
+    sf::RenderWindow window(sf::VideoMode(640, 480), "ImGui + SFML = <3");
+    window.setFramerateLimit(60);
+    if (!ImGui::SFML::Init(window)) return -1;
+
+    sf::CircleShape shape(100.f);
+    shape.setFillColor(sf::Color::Green);
+
+    sf::Clock deltaClock;
+    while (window.isOpen()) {
+        sf::Event event{};
+        while (window.pollEvent(event)) {
+            ImGui::SFML::ProcessEvent(window, event);
+
+            if (event.type == sf::Event::Closed) {
+                window.close();
+            }
+        }
+
+        ImGui::SFML::Update(window, deltaClock.restart());
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Begin("Hello, world!");
+        ImGui::Button("Look at this pretty button");
+        ImGui::End();
+
+        window.clear();
+        window.draw(shape);
+        ImGui::SFML::Render(window);
+        window.display();
+    }
+
+    ImGui::SFML::Shutdown();
+    return 0;
+}
 
 int main() {
     System sys;
@@ -108,7 +153,7 @@ int main() {
     Entity green;
     Entity blue;
     
-    std::vector<vec2f> model_rect = {vec2f(30.f, 30.f), vec2f(30.f, -30.f), vec2f(-30.f, -30.f), vec2f(-30.f, 30.f)};
+    std::vector<vec2f> model_rect = {vec2f(30.f, 30.f),  vec2f(40.f, 0.f),  vec2f(30.f, -30.f),  vec2f(0.f, -40.f),  vec2f(-30.f, -30.f), vec2f(-30.f, 30.f)};
     
     vec2f win_size = {800.f, 800.f};
     AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
@@ -124,9 +169,8 @@ int main() {
     // create the window
     sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Close);
     
+    if (!ImGui::SFML::Init(window)) return -1;
     
-        
-    assert(ImGui::SFML::Init(window));
     ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
     sf::Clock delTclock;
 
@@ -134,8 +178,9 @@ int main() {
     while (window.isOpen()) {
         // check all the window's events that were triggered since the last
         // iteration of the loop
-        sf::Event event;
+        sf::Event event{};
         while (window.pollEvent(event)) {
+            ImGui::SFML::ProcessEvent(window, event);
             // "close requested" event: we close the window
             if (event.type == sf::Event::Closed)
                 window.close();
@@ -146,14 +191,20 @@ int main() {
                     sys.add(Entity(), "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
+                if(event.key.code == sf::Keyboard::B) {
+                    auto m = model_rect;
+                    for(auto& p : m) p *= 0.5f;
+                    auto mouse_pos = sf::Mouse::getPosition(window);
+                    EPI_LOG(LogLevel::DEBUG) << mouse_pos.x << "\t" << mouse_pos.y;
+                    sys.add(Entity(), "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, m);
+                    hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+                }
             }
-            ImGui::SFML::ProcessEvent(event);
         }
         auto delTtime = delTclock.restart();
         ImGui::SFML::Update(window, delTtime);
 
         // clear the window with black color
-        window.clear(sf::Color::Black);
         
         Transform::updateLocalTransforms(sys.transforms.slice<Position, Rotation, Scale, LocalTransform>());
         
@@ -161,13 +212,20 @@ int main() {
             sys.transforms.sliceOwner<LocalTransform, GlobalTransform>(),
             sys.hierarchy, hierarchy_bfs);
 
+        static constexpr float gravity = 1000.f;
+        for(auto [vel] : sys.rb_sys.slice<Rigidbody::Velocity>() ){
+            vel.y += delTtime.asSeconds() * gravity;
+        }
+        
+        sys.phy_man.steps = 4;
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, delTtime.asSeconds());
+        window.clear(sf::Color::Black);
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
         for (auto [e, global_trans] : sys.transforms.sliceOwner<GlobalTransform>()) {
             positions.push_back(global_trans.transformPoint(0.f, 0.f));
             ids.push_back(e);
         }
-        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, delTtime.asSeconds());
 
         sf::CircleShape cs;
         cs.setRadius(5.f);
@@ -177,8 +235,6 @@ int main() {
             cs.setFillColor(sys.color_table[ids[i]]);
             window.draw(cs);
         }
-        auto vel = sys.rb_sys.try_get<Rigidbody::Velocity>(red);
-        
         Collider::calcParitionedShapes(sys.col_sys.slice<Collider::ShapeModel, Collider::ShapePartitioned>());
         Collider::updatePartitionedTransformedShapes(
             sys.col_sys.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
@@ -197,6 +253,7 @@ int main() {
                 }
             }
         }
+        
         {
             auto convertToImVec = [](sf::Vector2f vec) {
                 return ImVec2(vec.x, vec.y);

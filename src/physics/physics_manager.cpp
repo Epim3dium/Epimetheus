@@ -376,10 +376,6 @@ void PhysicsManager::integrate( float delT, ColCompGroup& group) const {
     
     integrateAny            (delT, group.slice  <isStaticFlag, Velocity, Position>           ());
     integrateAny            (delT, group.slice  <isStaticFlag, AngularVelocity, Rotation>    ());
-    for(auto [vel] : group.slice<Rigidbody::Velocity>() ){
-        static constexpr float gravity = 1000.f;
-        vel.y += delT * gravity;
-    }
 }
 void PhysicsManager::rollbackGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const {
     for(auto [g, l] : slice)
@@ -390,7 +386,7 @@ void PhysicsManager::updateGlobalTransform(Slice<GlobalTransform, LocalTransform
         g.combine(l);
 }
 
-#define VERY_SMALL_NUMBER (0.0000000001f)
+#define VERY_SMALL_NUMBER (0.001f)
 void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
             Collider::System& col_sys, Material::System& mat_sys,
             float delT) const 

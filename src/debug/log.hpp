@@ -79,6 +79,11 @@ public:
     else if (level > Log::ReportingLevel) ; \
     else Log().Get(level)
 
+#define EPI_LOG_DEBUG \
+    if (LogLevel::DEBUG > FILELOG_MAX_LEVEL) ;\
+    else if (LogLevel::DEBUG > Log::ReportingLevel) ; \
+    else Log().Get(LogLevel::DEBUG)
+
 #define EPI_LOG_TRACE(level) \
     if (level > FILELOG_MAX_LEVEL) ;\
     else if (level > Log::ReportingLevel) ; \
