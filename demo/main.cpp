@@ -62,30 +62,35 @@ struct System {
     Entity world;
     std::unordered_map<Entity, sf::Color> color_table;
     std::unordered_map<Entity, std::string> name_table;
-    void add(Entity id, std::string name, Transform::Position p, Transform::Rotation r, Hierarchy::Parent parent,
+    void add(Entity id, std::string name, Transform::Position pos, Transform::Rotation r, Hierarchy::Parent parent,
              sf::Color color, std::vector<vec2f> model) {
         name_table[id] = name;
-        transforms.push_back(id, p, r);
+        transforms.push_back(id, pos, r);
         hierarchy.push_back(id, parent, Hierarchy::Children{});
         hierarchy.try_get<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
-        rb_sys.push_back(id, Rigidbody::isStaticFlag(false));
+        
+        auto area = epi::area(model);
+        EPI_LOG(LogLevel::DEBUG) << "pos: " << pos.x << ",\t" << pos.y << "\tmass: " << area;
+        rb_sys.push_back(id, Rigidbody::isStaticFlag(false), Rigidbody::Mass(area));
         mat_sys.push_back(id);
         col_sys.push_back(id, model);
     }
     void add(Entity id, std::string name, Hierarchy::Parent parent,
              sf::Color color, std::vector<vec2f> points, bool isStatic = false) {
         name_table[id] = name;
-        auto avg = std::reduce(points.begin(), points.end()) / static_cast<float>(points.size());
+        auto pos = centerOfMass(points);
         for(auto& p : points) {
-            p -= avg;
+            p -= pos;
         }
         
-        transforms.push_back(id, Position(avg), Rotation{0.f});
+        transforms.push_back(id, Position(pos), Rotation{0.f});
         hierarchy.push_back(id, parent, Hierarchy::Children{});
         hierarchy.try_get<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
-        rb_sys.push_back(id, Rigidbody::isStaticFlag(isStatic));
+        auto area = epi::area(points);
+        EPI_LOG(LogLevel::DEBUG) << pos.x << "\t" << pos.y << "\t" << area;
+        rb_sys.push_back(id, Rigidbody::isStaticFlag(isStatic), Rigidbody::Mass(area));
         mat_sys.push_back(id);
         col_sys.push_back(id, points);
     }
@@ -144,6 +149,19 @@ int not_main() {
     return 0;
 }
 
+vec2f getCenterOfMass(std::vector<vec2f> model) {
+    vec2f sum_avg = {0, 0};
+    float sum_weight = 0.f;
+    auto prev = model.back();
+    for (auto next : model) {
+        float area_step = abs(cross(prev, next))/2.f;
+        sum_weight += area_step;
+        sum_avg += (next + prev) / 3.f * area_step;
+        prev = next;
+    }
+    return sum_avg / sum_weight;
+}
+
 int main() {
     System sys;
 
@@ -152,8 +170,15 @@ int main() {
     Entity yellow;
     Entity green;
     Entity blue;
-    
-    std::vector<vec2f> model_rect = {vec2f(30.f, 30.f),  vec2f(40.f, 0.f),  vec2f(30.f, -30.f),  vec2f(0.f, -40.f),  vec2f(-30.f, -30.f), vec2f(-30.f, 30.f)};
+
+    std::vector<vec2f> model_rect = {vec2f(30.f, 30.f), /* vec2f(40.f, 0.f), */    vec2f(30.f, -30.f)/* , vec2f(10.f, -37.f), vec2f(8.f, -39.f), vec2f(0.f, -40.f) */, vec2f(-30.f, -30.f), vec2f(-30.f, 30.f)};
+    //green
+    vec2f def_avg = {0, 0}; 
+    //red
+    vec2f model_avg = std::reduce(model_rect.begin(), model_rect.end()) / static_cast<float>(model_rect.size());
+    //blue
+    vec2f area_avg = getCenterOfMass(model_rect);
+    //pos, pos + model_avg, pos + area_avg, model
     
     vec2f win_size = {800.f, 800.f};
     AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
@@ -168,11 +193,13 @@ int main() {
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Close);
+    window.setFramerateLimit(60U);
     
     if (!ImGui::SFML::Init(window)) return -1;
     
     ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
     sf::Clock delTclock;
+    System sys_clone;
 
     // run the program as long as the window is open
     while (window.isOpen()) {
@@ -187,16 +214,30 @@ int main() {
             if(event.type == sf::Event::KeyPressed) {
                 if(event.key.code == sf::Keyboard::V) {
                     auto mouse_pos = sf::Mouse::getPosition(window);
-                    EPI_LOG(LogLevel::DEBUG) << mouse_pos.x << "\t" << mouse_pos.y;
-                    sys.add(Entity(), "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
+                    Entity t;
+                    sys.add(t, "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
+                    // sys.rb_sys.get<Rigidbody::lockRotationFlag>(t) = true;
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
                 if(event.key.code == sf::Keyboard::B) {
                     auto m = model_rect;
                     for(auto& p : m) p *= 0.5f;
-                    auto mouse_pos = sf::Mouse::getPosition(window);
-                    EPI_LOG(LogLevel::DEBUG) << mouse_pos.x << "\t" << mouse_pos.y;
-                    sys.add(Entity(), "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, m);
+                    auto mouse_pos = (vec2f)sf::Mouse::getPosition(window);
+                    sys.add(Entity(), "", Position(mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
+                    hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+                }
+                if(event.key.code == sf::Keyboard::C) {
+                    auto m = model_rect;
+                    for(auto& p : m) p *= 1.5f;
+                    auto mouse_pos = (vec2f)sf::Mouse::getPosition(window);
+                    sys.add(Entity(), "", Position(mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
+                    hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+                }
+                if(event.key.code == sf::Keyboard::S && !event.key.shift) {
+                    sys_clone = sys;
+                }
+                if(event.key.code == sf::Keyboard::S && event.key.shift) {
+                    sys = sys_clone;
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
             }
@@ -213,12 +254,11 @@ int main() {
             sys.hierarchy, hierarchy_bfs);
 
         static constexpr float gravity = 1000.f;
-        for(auto [vel] : sys.rb_sys.slice<Rigidbody::Velocity>() ){
-            vel.y += delTtime.asSeconds() * gravity;
+        for(auto [force, mass] : sys.rb_sys.slice<Rigidbody::Force, Rigidbody::Mass>() ){
+            force.y += gravity /* * mass */;
         }
         
-        sys.phy_man.steps = 4;
-        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, delTtime.asSeconds());
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, 1.f / 60.f /* delTtime.asSeconds() */);
         window.clear(sf::Color::Black);
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
@@ -235,6 +275,9 @@ int main() {
             cs.setFillColor(sys.color_table[ids[i]]);
             window.draw(cs);
         }
+        cs.setRadius(2.f);
+        cs.setOrigin(2.f, 2.f);
+        cs.setFillColor(sf::Color::Green);
         Collider::calcParitionedShapes(sys.col_sys.slice<Collider::ShapeModel, Collider::ShapePartitioned>());
         Collider::updatePartitionedTransformedShapes(
             sys.col_sys.sliceOwner<Collider::ShapePartitioned, Collider::ShapeTransformedPartitioned>(),
@@ -242,12 +285,13 @@ int main() {
         
         for(auto [shape] : sys.col_sys.slice<Collider::ShapeTransformedPartitioned>()) {
             sf::Vertex vert[2];
-            vert[0].color = sf::Color::Cyan;
-            vert[1].color = sf::Color::Cyan;
+            static const sf::Color clr = sf::Color::Green; 
+            vert[0].color = clr;
+            vert[1].color = clr;
             for(auto& convex : shape) {
                 vert[0].position = convex.back();
                 for(auto& point : convex) {
-                    vert[1] = point;
+                    vert[1].position = point;
                     window.draw(vert, 2U, sf::Lines);
                     vert[0] = vert[1];
                 }
