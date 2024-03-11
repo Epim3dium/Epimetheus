@@ -22,6 +22,7 @@ std::vector<vec2f> findContactPointFast(const ConvexPolygon* p0, const ConvexPol
 std::vector<vec2f> findContactPoints(const ConvexPolygon& r1, const ConvexPolygon& r2);
 //calculates area of polygon whose center should be at {0, 0}
 float area(const std::vector<vec2f>& model);
+vec2f centerOfMass(std::vector<vec2f> model);
 //returns true if a and b are nearly equal
 bool nearlyEqual(float a, float b);
 //returns true if a and b are nearly equal

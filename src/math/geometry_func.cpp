@@ -576,6 +576,21 @@ std::vector<vec2f> findContactPoints(const ConvexPolygon& p0, const ConvexPolygo
     }
     return result;
 }
+vec2f centerOfMass(std::vector<vec2f> model) {
+    vec2f inside = std::reduce(model.begin(), model.end()) / static_cast<float>(model.size());
+    vec2f sum_avg = {0, 0};
+    float sum_weight = 0.f;
+    auto prev = model.back();
+    for (auto next : model) {
+        auto a = prev - inside;
+        auto b = next - inside;
+        float area_step = abs(cross(a, b))/2.f;
+        sum_weight += area_step;
+        sum_avg += (prev + next + inside) / 3.f * area_step;
+        prev = next;
+    }
+    return sum_avg / sum_weight;
+}
 float area(const std::vector<vec2f>& model) {
     double area = 0.0;
     // Calculate value of shoelace formula
@@ -709,18 +724,16 @@ float calculateInertia(const std::vector<vec2f>& model, float mass) {
     float area = 0;
     float mmoi = 0;
 
-    int prev = model.size()-1;
-    for (int index = 0; index < model.size(); index++) {
-        auto a = model[prev];
-        auto b = model[index];
+    auto prev = model.back();
+    for (auto next : model) {
 
-        float area_step = abs(cross(a, b))/2.f;
-        float mmoi_step = area_step*(dot(a, a)+dot(b, b)+abs(dot(a, b)))/6.f;
+        float area_step = abs(cross(prev, next))/2.f;
+        float mmoi_step = area_step*(dot(prev, prev) + dot(next, next) + abs(dot(prev, next))) / 6.f;
 
         area += area_step;
         mmoi += mmoi_step;
 
-        prev = index;
+        prev = next;
     }
     
     double density = mass/area;
