@@ -17,21 +17,16 @@ namespace epi {
 CollisionInfo detectOverlap(const std::vector<vec2f>& p1, const std::vector<vec2f>& p2) {
     auto intersection = intersectPolygonPolygon(p1, p2);
     if(intersection.detected) {
-        // auto cps = findContactPoints(ConvexPolygon::CreateFromPoints(p1), ConvexPolygon::CreateFromPoints(p2));
-        // if(cps.size() == 0)
-        //     return {false};
-        // auto cp = std::reduce(cps.begin(), cps.end()) / static_cast<float>(cps.size());
         return {true, intersection.contact_normal, intersection.cp, intersection.overlap};
     }
     return {false};
 }
+
 DefaultSolver::ReactionResponse DefaultSolver::processReaction(vec2f cn, float sfric, float dfric, float bounce, 
         float inv_inertia1, float mass1, vec2f rad1, vec2f vel1, float ang_vel1,
         float inv_inertia2, float mass2, vec2f rad2, vec2f vel2, float ang_vel2) {
 
     
-    vec2f impulse (0, 0);
-
     vec2f rad1perp(-rad1.y, rad1.x);
     vec2f rad2perp(-rad2.y, rad2.x);
 
@@ -46,7 +41,10 @@ DefaultSolver::ReactionResponse DefaultSolver::processReaction(vec2f cn, float s
 
     float j = getReactImpulse(rad1perp, inv_inertia1, mass1, rad2perp, inv_inertia2, mass2, bounce, rel_vel, cn);
     vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
-    impulse += cn * j - fj;
+    vec2f impulse = cn * j - fj;
+    if(nearlyEqual(j, 0.f)) {
+        impulse = vec2f(0, 0);
+    }
 
     ReactionResponse result;
     result.vel_change1 = -impulse / mass1;

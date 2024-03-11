@@ -21,16 +21,6 @@ struct CollisionInfo {
     vec2f contact_point;
     float overlap;
 };
-/*
-* \brief Interface Class for creating collider classes , an extension of GAMEOBJECT
-*(has prop list and notifies of death)
-*( one of 3 key components to collsion simulation)
-* virtual functions: 
-*   AABB getAABB()
-*   eCollisionShape getType()
-*   float calcInertia()
-*Collider(Transform* trans)
-*/
 struct ColliderEvent {
     Entity me;
     Entity other;

@@ -12,7 +12,7 @@ EPI_WRAP_TYPE(PrimitiveWrapper<float>, AirDrag);
 struct System : public Group<Restitution, StaticFric, DynamicFric, AirDrag> {
     System() {
         setDefault<Restitution>({0.1f});
-        setDefault<StaticFric>({0.6f});
+        setDefault<StaticFric>({0.8f});
         setDefault<DynamicFric>({0.4f});
         setDefault<AirDrag>({0.1f});
     }

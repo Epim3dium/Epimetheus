@@ -2,6 +2,7 @@
 #include "restraint.hpp"
 #include "rigidbody.hpp"
 #include "solver.hpp"
+#include "multithreading/thread_pool.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -62,8 +63,8 @@ private:
     }
     typedef std::pair<size_t, size_t> ColParticipants;
 
-    std::unique_ptr<SolverInterface> _solver =
-        std::make_unique<DefaultSolver>();
+    SolverInterface* _solver =
+        new DefaultSolver();
 
     std::vector<ColParticipants> processBroadPhase(OwnerSlice<ShapeTransformedPartitioned> slice) const;
     std::vector<ColParticipants> filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info, const std::vector<ColParticipants> broad_result) const;
@@ -73,7 +74,7 @@ private:
         float sfric;
         float dfric;
     };
-    std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const;
+    std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list, std::vector<std::mutex>& locks) const;
     void solveOverlaps(Slice<isStaticFlag, Position> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list, std::vector<float>& pressures) const;
     std::vector<MaterialTuple> calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const;
     void processReactions(Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
@@ -82,7 +83,7 @@ private:
                       const std::vector<std::vector<CollisionInfo>>& col_info,
                       const std::vector<ColParticipants>& col_list) const; 
     //V
-    void processNarrowPhase(ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list) const;
+    void processNarrowPhase(ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list, std::vector<std::mutex>& locks) const;
     
     void copyResultingVelocities(OwnerSlice<Velocity, AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
     void copyResultingTransforms(OwnerSlice<Position, Rotation> result_slice, Transform::System& trans_sys) const; 

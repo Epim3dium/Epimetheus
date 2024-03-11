@@ -25,33 +25,6 @@
 
 namespace epi {
 
-//from 1 to n
-//veci communities(n + 1, -1);
-
-// Collider* getHead(Collider* col) {
-//     if(col->parent_collider == col)
-//         return col;
-//     std::vector<Collider*> to_speed;
-//     while(col->parent_collider != col) {
-//         to_speed.push_back(col);
-//         col = col->parent_collider;
-//     }
-//     for(auto t : to_speed)
-//         t->parent_collider = col;
-//     return col;
-// }
-//
-// void Merge(Collider* a, Collider* b) {
-//     a = getHead(a);
-//     b = getHead(b);
-//     if(a != b) {
-//         b->parent_collider = a;
-//     }
-// }
-// bool Friends(Collider* a, Collider* b) {
-//     return getHead(a) == getHead(b);
-// }
-
 static bool areCompatible(const Collider::Mask& mask1, const Collider::Tag& tag1,
                         const Collider::Mask& mask2, const Collider::Tag& tag2) 
 {
@@ -125,19 +98,23 @@ PhysicsManager::filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info
         if(isStat1 && isStat2)
             continue;
         if(areCompatible(mask1, tag1, mask2, tag2)) {
-            compatible_collisions.push_back({idx1, idx2});
+            compatible_collisions.push_back({std::min(idx1, idx2), std::max(idx1, idx2)});
         }
     }
     return compatible_collisions;
 }
-std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
-    std::vector<std::vector<CollisionInfo>> result;
-    result.reserve(col_list.size());
-    for(auto [idx1, idx2] : col_list) {
+std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list, std::vector<std::mutex>& locks) const {
+    std::vector<std::vector<CollisionInfo>> result(col_list.size());
+    for(size_t i = 0; i < col_list.size(); i++) {
+        auto [idx1, idx2] = col_list[i];
+        locks[idx1].lock();
+        locks[idx2].lock();
         auto [shape1] = *(shapes.begin() + idx1);
         auto [shape2] = *(shapes.begin() + idx2);
         auto col_infos = _solver->detect(shape1, shape2);
-        result.push_back(col_infos);
+        result[i] = col_infos;
+        locks[idx1].unlock();
+        locks[idx2].unlock();
     }
     return result;
 }
@@ -152,13 +129,14 @@ void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
         
         float pressure1 = pressure_list[idx1];
         float pressure2 = pressure_list[idx2];
+        float denom = 2.f / (pressure1 + pressure2);
         
         auto [isStatic1, pos1] = *(shape_info.begin() + idx1);
         auto [isStatic2, pos2] = *(shape_info.begin() + idx2);
         for(const auto& info : col_info[i]) {
             auto [off1, off2] = _solver->solveOverlap(info, isStatic1, pos1, isStatic2, pos2);
-            pos1 += off1 * (pressure2 / (pressure1 + pressure2));
-            pos2 += off2 * (pressure1 / (pressure1 + pressure2));
+            pos1 += off1 * denom * pressure2;
+            pos2 += off2 * denom * pressure1;
         }
     }
 }
@@ -233,8 +211,8 @@ void PhysicsManager::processReactions(Slice < isStaticFlag, lockRotationFlag, Ma
         }
     }
 }
-void PhysicsManager::processNarrowPhase(ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list, std::vector<float>& pressure_list) const {
-    auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), col_list);
+void PhysicsManager::processNarrowPhase(ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list, std::vector<float>& pressure_list, std::vector<std::mutex>& locks) const {
+    auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), col_list, locks);
     
     solveOverlaps(colliding.slice<isStaticFlag, Position>(), col_infos, col_list, pressure_list);
     for(int i = 0; i < col_infos.size(); i++) {
@@ -404,8 +382,15 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     auto potential_col_list = processBroadPhase(objects.sliceOwner<ShapeTransformedPartitioned>());
     auto col_list = filterBroadPhaseResults(objects.slice<isStaticFlag, Mask, Tag>(), potential_col_list);
     std::vector<float> pressure_list(objects.size(), VERY_SMALL_NUMBER);
+    std::vector<std::mutex> locks(objects.size());
     for (int i = 0; i < steps; i++) {
+        if(steps % 2 == 0) {
+            potential_col_list = processBroadPhase(objects.sliceOwner<ShapeTransformedPartitioned>());
+            col_list = filterBroadPhaseResults(objects.slice<isStaticFlag, Mask, Tag>(), potential_col_list);
+        }
+        processNarrowPhase(objects, col_list, pressure_list, locks);
         integrate(deltaStep, objects);
+        
         
         rollbackGlobalTransform         (objects.slice<GlobalTransform, LocalTransform>                                ());
         Transform::updateLocalTransforms(objects.slice<Position, Rotation, Scale, LocalTransform>());
@@ -415,8 +400,6 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
                 objects.sliceOwner<ShapePartitioned, ShapeTransformedPartitioned>(),
                 objects.slice<GlobalTransform>());
         
-        
-        processNarrowPhase(objects, col_list, pressure_list);
     }
     copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
     copyResultingVelocities(objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
