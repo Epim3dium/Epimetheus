@@ -63,8 +63,8 @@ private:
     }
     typedef std::pair<size_t, size_t> ColParticipants;
 
-    SolverInterface* _solver =
-        new DefaultSolver();
+    std::shared_ptr<SolverInterface> _solver =
+        std::make_shared<DefaultSolver>();
 
     std::vector<ColParticipants> processBroadPhase(OwnerSlice<ShapeTransformedPartitioned> slice) const;
     std::vector<ColParticipants> filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info, const std::vector<ColParticipants> broad_result) const;
@@ -77,13 +77,13 @@ private:
     std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list, std::vector<std::mutex>& locks) const;
     void solveOverlaps(Slice<isStaticFlag, Position> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list, std::vector<float>& pressures) const;
     std::vector<MaterialTuple> calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const;
-    void processReactions(Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
+    void processReactions(float delT, Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
                       AngularVelocity, InertiaDevMass, Position> react_info,
                       const std::vector<MaterialTuple>& mat_info,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
                       const std::vector<ColParticipants>& col_list) const; 
     //V
-    void processNarrowPhase(ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list, std::vector<std::mutex>& locks) const;
+    void processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, std::vector<std::mutex>& locks) const;
     
     void copyResultingVelocities(OwnerSlice<Velocity, AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
     void copyResultingTransforms(OwnerSlice<Position, Rotation> result_slice, Transform::System& trans_sys) const; 
@@ -114,7 +114,7 @@ private:
 
 public :
     // number of physics/collision steps per frame
-    size_t steps = 8;
+    size_t steps = 8U;
 
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,

@@ -38,6 +38,10 @@ DefaultSolver::ReactionResponse DefaultSolver::processReaction(vec2f cn, float s
 
     //calculate relative velocity
     vec2f rel_vel = vel_sum2 - vel_sum1;
+    if (dot(rel_vel, cn) < 0.f)
+    {
+        return {vec2f(), 0.f, vec2f(), 0.f};
+    }
 
     float j = getReactImpulse(rad1perp, inv_inertia1, mass1, rad2perp, inv_inertia2, mass2, bounce, rel_vel, cn);
     vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
@@ -116,18 +120,19 @@ std::pair<vec2f, vec2f> DefaultSolver::solveOverlap(const CollisionInfo& info,
         bool isStatic1, vec2f pos1, 
         bool isStatic2, vec2f pos2) 
 {
-    if(!info.detected)
+    if(!info.detected || (isStatic1 && isStatic2))
         return {};
 
-    constexpr float response_coef = 0.9f;
+    constexpr float response_coef = 1.0f;
     const float offset = info.overlap * response_coef;
 
+    vec2f push_out = info.contact_normal * offset;
     if(isStatic2) {
-        return {info.contact_normal * offset, vec2f(0, 0)};
+        return {push_out, vec2f(0, 0)};
     } else if(isStatic1) {
-        return {vec2f(0, 0), -info.contact_normal * offset};
+        return {vec2f(0, 0), -push_out};
     } else {
-        return {info.contact_normal * offset * 0.5f, -info.contact_normal * offset * 0.5f}; 
+        return {push_out / 2.f, -push_out / 2.f}; 
     }
 }
 // void DefaultSolver::solve(CollisionInfo man, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction)  {

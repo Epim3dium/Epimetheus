@@ -14,7 +14,7 @@ struct System : public Group<Restitution, StaticFric, DynamicFric, AirDrag> {
         setDefault<Restitution>({0.1f});
         setDefault<StaticFric>({0.8f});
         setDefault<DynamicFric>({0.4f});
-        setDefault<AirDrag>({0.1f});
+        setDefault<AirDrag>({0.01f});
     }
 };
 };
