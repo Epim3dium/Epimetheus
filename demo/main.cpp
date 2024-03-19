@@ -71,7 +71,6 @@ struct System {
         color_table[id] = color;
         
         auto area = epi::area(model);
-        EPI_LOG(LogLevel::DEBUG) << "pos: " << pos.x << ",\t" << pos.y << "\tmass: " << area;
         rb_sys.push_back(id, Rigidbody::isStaticFlag(false), Rigidbody::Mass(area));
         mat_sys.push_back(id);
         col_sys.push_back(id, model);
@@ -89,7 +88,6 @@ struct System {
         hierarchy.try_get<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
         auto area = epi::area(points);
-        EPI_LOG(LogLevel::DEBUG) << pos.x << "\t" << pos.y << "\t" << area;
         rb_sys.push_back(id, Rigidbody::isStaticFlag(isStatic), Rigidbody::Mass(area));
         mat_sys.push_back(id);
         col_sys.push_back(id, points);
@@ -112,42 +110,6 @@ struct System {
 #include <SFML/System/Clock.hpp>
 #include <SFML/Window/Event.hpp>
 
-int not_main() {
-    sf::RenderWindow window(sf::VideoMode(640, 480), "ImGui + SFML = <3");
-    window.setFramerateLimit(60);
-    if (!ImGui::SFML::Init(window)) return -1;
-
-    sf::CircleShape shape(100.f);
-    shape.setFillColor(sf::Color::Green);
-
-    sf::Clock deltaClock;
-    while (window.isOpen()) {
-        sf::Event event{};
-        while (window.pollEvent(event)) {
-            ImGui::SFML::ProcessEvent(window, event);
-
-            if (event.type == sf::Event::Closed) {
-                window.close();
-            }
-        }
-
-        ImGui::SFML::Update(window, deltaClock.restart());
-
-        ImGui::ShowDemoWindow();
-
-        ImGui::Begin("Hello, world!");
-        ImGui::Button("Look at this pretty button");
-        ImGui::End();
-
-        window.clear();
-        window.draw(shape);
-        ImGui::SFML::Render(window);
-        window.display();
-    }
-
-    ImGui::SFML::Shutdown();
-    return 0;
-}
 
 vec2f getCenterOfMass(std::vector<vec2f> model) {
     vec2f sum_avg = {0, 0};
@@ -193,13 +155,14 @@ int main() {
 
     // create the window
     sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Close);
-    window.setFramerateLimit(60U);
+    // window.setFramerateLimit(60U);
     
     if (!ImGui::SFML::Init(window)) return -1;
     
     ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
     sf::Clock delTclock;
     System sys_clone;
+    std::vector<vec2f> creation_points;
 
     // run the program as long as the window is open
     while (window.isOpen()) {
@@ -211,7 +174,20 @@ int main() {
             // "close requested" event: we close the window
             if (event.type == sf::Event::Closed)
                 window.close();
+            if(event.type == sf::Event::MouseButtonPressed) {
+                if(event.mouseButton.button == sf::Mouse::Left) {
+                    auto mouse_pos = sf::Mouse::getPosition(window);
+                    creation_points.push_back((vec2f)mouse_pos);
+                }
+            }
             if(event.type == sf::Event::KeyPressed) {
+                if(event.key.code == sf::Keyboard::R) {
+                    creation_points.clear();
+                }
+                if(event.key.code == sf::Keyboard::Enter) {
+                    sys.add(Entity(), "", sys.world, sf::Color::White, creation_points);
+                    hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+                }
                 if(event.key.code == sf::Keyboard::V) {
                     auto mouse_pos = sf::Mouse::getPosition(window);
                     Entity t;
@@ -253,12 +229,8 @@ int main() {
             sys.transforms.sliceOwner<LocalTransform, GlobalTransform>(),
             sys.hierarchy, hierarchy_bfs);
 
-        static constexpr float gravity = 1000.f;
-        for(auto [force, mass] : sys.rb_sys.slice<Rigidbody::Force, Rigidbody::Mass>() ){
-            force.y += gravity /* * mass */;
-        }
         
-        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, 1.f / 60.f /* delTtime.asSeconds() */);
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, /* 1.f / 60.f */ delTtime.asSeconds() );
         window.clear(sf::Color::Black);
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
@@ -273,6 +245,13 @@ int main() {
         for (int i = 0; i < positions.size(); i++) {
             cs.setPosition(positions[i]);
             cs.setFillColor(sys.color_table[ids[i]]);
+            window.draw(cs);
+        }
+        cs.setFillColor(sf::Color::Red);
+        cs.setRadius(2.f);
+        cs.setOrigin(2.f, 2.f);
+        for (int i = 0; i < creation_points.size(); i++) {
+            cs.setPosition(creation_points[i]);
             window.draw(cs);
         }
         cs.setRadius(2.f);
