@@ -107,11 +107,8 @@ std::vector<CollisionInfo> DefaultSolver::detect(const Collider::ShapeTransforme
     std::vector<CollisionInfo> result;
     for(const auto& poly1 : col1) {
         for(const auto& poly2 : col2) {
-            auto aabb1 = AABB::CreateFromVerticies(poly1);
-            auto aabb2 = AABB::CreateFromVerticies(poly2);
-            if(!isOverlappingAABBAABB(aabb1, aabb2))
-                continue;
-            result.push_back(detectOverlap(poly1, poly2));
+            auto detection = detectOverlap(poly1, poly2);
+            result.push_back(detection);
         }
     }
     return result; 
@@ -123,7 +120,7 @@ std::pair<vec2f, vec2f> DefaultSolver::solveOverlap(const CollisionInfo& info,
     if(!info.detected || (isStatic1 && isStatic2))
         return {};
 
-    constexpr float response_coef = 1.0f;
+    constexpr float response_coef = 0.5f;
     const float offset = info.overlap * response_coef;
 
     vec2f push_out = info.contact_normal * offset;

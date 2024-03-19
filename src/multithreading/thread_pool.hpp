@@ -137,8 +137,6 @@ public:
             const uint32_t start = batch_size * m_thread_count;
             callback(start, element_count);
         }
-
-        waitForCompletion();
     }
 };
 

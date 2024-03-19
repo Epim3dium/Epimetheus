@@ -230,7 +230,8 @@ int main() {
             sys.hierarchy, hierarchy_bfs);
 
         
-        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, /* 1.f / 60.f */ delTtime.asSeconds() );
+        static ThreadPool tp;
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, /* 1.f / 60.f */ delTtime.asSeconds(), tp);
         window.clear(sf::Color::Black);
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
