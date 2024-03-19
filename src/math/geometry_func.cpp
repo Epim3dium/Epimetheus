@@ -606,8 +606,8 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
     float overlap = INFINITY;
     vec2f cn;
 
-    vec2f cp;
-    int ref_poly = -1;
+    //calculate contact point only after finding max penetration
+    std::pair<std::array<vec2f, 2U>, int> cp_calc_info;
     
     for (int poly1 = 0; poly1 < 2; poly1++) {
         auto poly2 = !poly1;
@@ -631,19 +631,27 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
                 max_r1 = std::max(max_r1, q);
             }
 
-            // Work out min and max 1D points for r2
             float min_r2 = INFINITY, max_r2 = -INFINITY;
-            vec2f min_p2, max_p2;
+            std::array<vec2f, 2U> min_p2, max_p2;
             for (auto p : *verticies[poly2]) {
-                
                 float q = dot(p, axisProj);
-                if(q < min_r2) {
+                
+                //additional if statements to find if edge is almost parallel to axisProj edge
+                if(nearlyEqual(q, min_r2)) {
+                    min_r2 = (q + min_r2) / 2.f;
+                    min_p2[1] = p;
+                }else if(q < min_r2) {
                     min_r2 = q;
-                    min_p2 = p;
+                    min_p2 = {p, p};
                 }
-                if(q > max_r2) {
+                
+                if(nearlyEqual(q, max_r2)) {
+                    max_r2 = (q + max_r2) / 2.f;
+                    max_p2[1] = p;
+                }
+                else if(q > max_r2) {
                     max_r2 = q;
-                    max_p2 = p;
+                    max_p2 = {p, p};
                 }
             }
 
@@ -654,14 +662,13 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
                 overlap = minmax - maxmin;
                 
                 cn = axisProj;
-                ref_poly = poly1;
                 if(poly1 == 1)
                     cn *= -1.f;
                 
                 if(minmax == max_r2) {
-                    cp = findClosestPointOnEdge(max_p2, *verticies[poly1]);
+                    cp_calc_info = {max_p2, poly1};
                 }else {
-                    cp = findClosestPointOnEdge(min_p2, *verticies[poly1]);
+                    cp_calc_info = {min_p2, poly1};
                     cn *= -1.f;
                 }
             }
@@ -670,9 +677,14 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
             prev = vert;
         }
     }
-    if(overlap == 0.f) {
+    if(overlap <= 0.f) {
         return {false};
     }
+    vec2f cp = {0, 0};
+    for(auto p : cp_calc_info.first) {
+        cp += findClosestPointOnEdge(p, *verticies[cp_calc_info.second]);
+    }
+    cp /= 2.f;
 
     return {true, cn, overlap, cp};
 }
