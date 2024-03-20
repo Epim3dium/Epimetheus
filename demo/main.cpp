@@ -6,6 +6,7 @@
 #include "core/hierarchy.hpp"
 #include "core/group.hpp"
 #include "debug/log.hpp"
+#include "memory/linear_allocator.hpp"
 #include "physics/collider.hpp"
 #include "physics/physics_manager.hpp"
 #include "physics/rigidbody.hpp"
@@ -145,17 +146,22 @@ int main() {
     vec2f win_size = {800.f, 800.f};
     AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
     AABB small_aabb = AABB::CreateCenterSize(big_aabb.center(), big_aabb.size() * 0.9f); 
-    sys.add(yellow,     "yellow", Parent{sys.world}, sf::Color::Yellow, {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
-    sys.add(magenta,     "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
-    sys.add(red,     "red", Parent{sys.world}, sf::Color::Red, {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
-    sys.add(green,     "green", Parent{sys.world}, sf::Color::Green, {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
+    sys.add(yellow,  "yellow",  Parent{sys.world}, sf::Color::Yellow,  {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
+    sys.add(magenta, "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
+    sys.add(red,     "red",     Parent{sys.world}, sf::Color::Red,     {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
+    sys.add(green,   "green",   Parent{sys.world}, sf::Color::Green,   {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
     // sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
-
     auto hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
 
-    // create the window
-    sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "My window", sf::Style::Close);
+   // create the window
+    sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "demo", sf::Style::Close);
+    // window.capture();
     // window.setFramerateLimit(60U);
+    vec2f pos = {300.f, 300.f};
+    vec2f offset = {50.f, 50.f};
+    vec2f axis = normal(vec2f(3.f, 1.f));
+    EPI_LOG_DEBUG << dot(pos, axis) + dot(offset, axis);
+    EPI_LOG_DEBUG << dot(pos + offset, axis);
     
     if (!ImGui::SFML::Init(window)) return -1;
     
