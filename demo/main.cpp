@@ -300,7 +300,12 @@ int main() {
             };
             ImGui::Begin("settings");
             ImGui::Text("ObjectCount: %zu", sys.transforms.size());
-            ImGui::Text("FPS: %f", 1.0 / delTtime.asSeconds());
+            static constexpr size_t sample_size = 300U;
+            static size_t cur_fps_idx = 0;
+            static std::vector<double> FPS(sample_size);
+            FPS[(cur_fps_idx++) % sample_size] = 1.0 / delTtime.asSeconds();
+            auto avg_fps = std::reduce(FPS.begin(), FPS.end()) / static_cast<double>(FPS.size());
+            ImGui::Text("FPS: %f", avg_fps);
             static std::string selected = sys.name_table.begin()->second;
             ImGui::Dummy({});
             for (auto [e, name] : sys.name_table) {
