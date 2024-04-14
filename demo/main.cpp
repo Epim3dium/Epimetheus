@@ -102,14 +102,6 @@ struct System {
         transforms.push_back(world, Position{}, Rotation{0.f});
     }
 };
-#include "imgui.h" // necessary for ImGui::*, imgui-SFML.h doesn't include imgui.h
-
-#include "imgui-SFML.h" // for ImGui::SFML::* functions and SFML-specific overloads
-
-#include <SFML/Graphics/CircleShape.hpp>
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/System/Clock.hpp>
-#include <SFML/Window/Event.hpp>
 
 
 vec2f getCenterOfMass(std::vector<vec2f> model) {
@@ -123,6 +115,59 @@ vec2f getCenterOfMass(std::vector<vec2f> model) {
         prev = next;
     }
     return sum_avg / sum_weight;
+}
+template<class T>
+void lerpAny(T& first, const T other, float t) {
+    first = first * t + other * (1.f - t);
+}
+template<>
+void lerpAny<Entity>(Entity& first, Entity other, float t) {
+    assert(first == other);
+}
+template <>
+void lerpAny<Collider::ShapeModel>(Collider::ShapeModel&, Collider::ShapeModel, float) {}
+template <>
+void lerpAny<Collider::ShapePartitioned>(Collider::ShapePartitioned&, Collider::ShapePartitioned, float) {}
+template <>
+void lerpAny<Collider::ShapeTransformedPartitioned>(Collider::ShapeTransformedPartitioned&,
+                                                    Collider::ShapeTransformedPartitioned, float) {}
+template <>
+void lerpAny<Collider::Mask>(Collider::Mask&, Collider::Mask, float) {}
+template <>
+void lerpAny<Collider::Tag>(Collider::Tag&, Collider::Tag, float) {}
+template <>
+void lerpAny<Transform::LocalTransform>(Transform::LocalTransform&, Transform::LocalTransform, float) {}
+template <>
+void lerpAny<Transform::GlobalTransform>(Transform::GlobalTransform&, Transform::GlobalTransform, float) {}
+//sys0 has to be older
+void lerp(double t, System& sys0, System& sys1) {
+    auto lerpSys = [&](auto& sy0, auto& sy1) {
+        auto slice0 = sy0.sliceAllOwner();
+        auto slice1 = sy1.sliceAllOwner();
+        auto itr1 = slice1.begin();
+        while(itr1 != slice1.end()) {
+            Entity entity = std::get<0U>(*itr1);
+            if(!slice0.contains(entity)) {
+                itr1++;
+                continue;
+            }
+            auto itr0 = slice0.begin() + slice0.getIndex(entity).value();
+            
+            std::apply([&](auto&... values1) 
+                {
+            std::apply([&](auto&... values0) 
+                {
+                    (lerpAny(values0, values1, t), ...);
+                }, *itr0);
+            }, *itr1);
+            
+            itr1++;
+        }
+    };
+    lerpSys(sys0.rb_sys, sys1.rb_sys);
+    lerpSys(sys0.col_sys, sys1.col_sys);
+    lerpSys(sys0.mat_sys, sys1.mat_sys);
+    lerpSys(sys0.transforms, sys1.transforms);
 }
 
 int main() {
@@ -152,11 +197,20 @@ int main() {
     sys.add(green,   "green",   Parent{sys.world}, sf::Color::Green,   {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
     // sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
     auto hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+    struct SaveData {
+        double time_stamp;
+        System world_state;
+    };
+    std::vector<SaveData> saves;
+    SaveData latest_save;
+    saves.push_back({0.0, sys});
+    const double save_interval = 0.5f;
+    double current_time;
 
    // create the window
     sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "demo", sf::Style::Close);
     // window.capture();
-    // window.setFramerateLimit(60U);
+    window.setFramerateLimit(60U);
     vec2f pos = {300.f, 300.f};
     vec2f offset = {50.f, 50.f};
     vec2f axis = normal(vec2f(3.f, 1.f));
@@ -167,7 +221,6 @@ int main() {
     
     ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
     sf::Clock delTclock;
-    System sys_clone;
     std::vector<vec2f> creation_points;
 
     // run the program as long as the window is open
@@ -175,6 +228,7 @@ int main() {
         // check all the window's events that were triggered since the last
         // iteration of the loop
         sf::Event event{};
+        auto delTtime = delTclock.restart();
         while (window.pollEvent(event)) {
             ImGui::SFML::ProcessEvent(window, event);
             // "close requested" event: we close the window
@@ -191,7 +245,11 @@ int main() {
                     creation_points.clear();
                 }
                 if(event.key.code == sf::Keyboard::Enter) {
-                    sys.add(Entity(), "", sys.world, sf::Color::White, creation_points);
+                    bool isStat = false;
+                    if(event.key.shift) {
+                        isStat =true;
+                    }
+                    sys.add(Entity(), "", sys.world, sf::Color::White, creation_points, isStat);
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
                 if(event.key.code == sf::Keyboard::V) {
@@ -215,17 +273,39 @@ int main() {
                     sys.add(Entity(), "", Position(mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
-                if(event.key.code == sf::Keyboard::S && !event.key.shift) {
-                    sys_clone = sys;
-                }
-                if(event.key.code == sf::Keyboard::S && event.key.shift) {
-                    sys = sys_clone;
-                    hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+            }else if(event.type == sf::Event::KeyReleased) {
+                if(event.key.code == sf::Keyboard::Dash) {
+                    sys = latest_save.world_state;
                 }
             }
         }
-        auto delTtime = delTclock.restart();
+        
+        float fixedDeltaTime = 1.f / 60.f;
+        // float fixedDeltaTime = delTtime.asSeconds();
+        
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Dash)) {
+            current_time -= fixedDeltaTime * 2.f; 
+            while(current_time < saves.back().time_stamp) {
+                latest_save = saves.back();
+                sys = latest_save.world_state;
+                saves.pop_back();
+                EPI_LOG_DEBUG << "reloaded new save_state";
+            }
+            float lerp_time = std::clamp<float>(1.f - (latest_save.time_stamp - current_time) / save_interval, 0.f, 1.f);
+            
+            sys = latest_save.world_state;
+            lerp(lerp_time, sys, saves.back().world_state);
+            hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+        }else {
+            latest_save.world_state = sys;
+            latest_save.time_stamp = current_time;
+        }
         ImGui::SFML::Update(window, delTtime);
+        if(current_time - save_interval > saves.back().time_stamp) {
+            EPI_LOG_DEBUG << "saved!";
+            saves.push_back({current_time, sys});
+        }
+        current_time += fixedDeltaTime;
 
         // clear the window with black color
         
@@ -237,7 +317,7 @@ int main() {
 
         
         static ThreadPool tp;
-        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, /* 1.f / 60.f */ delTtime.asSeconds(), tp);
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, fixedDeltaTime /* delTtime.asSeconds() */, tp);
         window.clear(sf::Color::Black);
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
