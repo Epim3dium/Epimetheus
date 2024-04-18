@@ -19,7 +19,7 @@ namespace epi {
 class Application {
 private:
     sf::RenderWindow m_window;
-    std::multimap<sf::Event::EventType, std::function<void(sf::Event)> > m_event_hooks;
+    std::multimap<sf::Event::EventType, std::function<void(sf::Event, const sf::Window&)> > m_event_hooks;
     int m_constant_framerate_set = 0;
 protected:
     virtual bool setup() {
@@ -32,7 +32,7 @@ protected:
     virtual void cleanup() {
     }
 public:
-    void addHook(sf::Event::EventType type, std::function<void(sf::Event)> callback) {
+    void addHook(sf::Event::EventType type, std::function<void(sf::Event, const sf::Window&)> callback) {
         m_event_hooks.insert({type, callback});
     }
     void setConstantFramerate(int framerate) {
@@ -66,7 +66,7 @@ public:
                 auto end = m_event_hooks.upper_bound(event.type);
                 
                 for(auto itr = begin; itr != end; itr++) {
-                    itr->second(event);
+                    itr->second(event, m_window);
                 }
             }
             ImGui::SFML::Update(m_window, delTtime);

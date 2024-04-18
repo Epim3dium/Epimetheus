@@ -1,19 +1,5 @@
-#include <SFML/Graphics.hpp>
-#include <iostream>
-#include <thread>
-#include <unordered_set>
+#include "app.hpp"
 
-#include "core/hierarchy.hpp"
-#include "core/group.hpp"
-#include "debug/log.hpp"
-#include "memory/linear_allocator.hpp"
-#include "physics/collider.hpp"
-#include "physics/physics_manager.hpp"
-#include "physics/rigidbody.hpp"
-#include "templates/primitive_wrapper.hpp"
-#include "imgui-SFML.h"
-#include "imgui.h"
-#include "imgui_internal.h"
 using namespace epi;
 
 bool SliderScalar2D(char const* pLabel, float* fValueX, float* fValueY,
@@ -33,11 +19,11 @@ typedef Group<Position, Rotation, Scale, LocalTransform, GlobalTransform>
     TransformGroup;
 void updateParentTransformByHierarchy(
     OwnerSlice<LocalTransform, GlobalTransform> slice,
-    const Hierarchy::System& hierarchy, std::pair<int, std::vector<size_t>> layer_info) 
+    const Hierarchy::System& hierarchy, std::vector<size_t> index_list) 
 {
     size_t to_update = 0;
     int iter = 0;
-    for (auto to_update_index : layer_info.second) {
+    for (auto to_update_index : index_list) {
         auto [e, my_trans, global_trans] = *std::next(slice.begin(), to_update_index);
 
         auto parent_maybe = hierarchy.try_cget<Hierarchy::Parent>(e);
@@ -104,18 +90,6 @@ struct System {
 };
 
 
-vec2f getCenterOfMass(std::vector<vec2f> model) {
-    vec2f sum_avg = {0, 0};
-    float sum_weight = 0.f;
-    auto prev = model.back();
-    for (auto next : model) {
-        float area_step = abs(cross(prev, next))/2.f;
-        sum_weight += area_step;
-        sum_avg += (next + prev) / 3.f * area_step;
-        prev = next;
-    }
-    return sum_avg / sum_weight;
-}
 template<class T>
 void lerpAny(T& first, const T other, float t) {
     first = first * t + other * (1.f - t);
@@ -169,8 +143,8 @@ void lerp(double t, System& sys0, System& sys1) {
     lerpSys(sys0.mat_sys, sys1.mat_sys);
     lerpSys(sys0.transforms, sys1.transforms);
 }
-
-int main() {
+class Demo : public Application {
+public:
     System sys;
 
     Entity red;
@@ -185,65 +159,53 @@ int main() {
     //red
     vec2f model_avg = std::reduce(model_rect.begin(), model_rect.end()) / static_cast<float>(model_rect.size());
     //blue
-    vec2f area_avg = getCenterOfMass(model_rect);
+    vec2f area_avg = centerOfMass(model_rect);
     //pos, pos + model_avg, pos + area_avg, model
     
     vec2f win_size = {800.f, 800.f};
     AABB big_aabb = AABB::CreateMinMax(vec2f(), win_size); 
     AABB small_aabb = AABB::CreateCenterSize(big_aabb.center(), big_aabb.size() * 0.9f); 
-    sys.add(yellow,  "yellow",  Parent{sys.world}, sf::Color::Yellow,  {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
-    sys.add(magenta, "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
-    sys.add(red,     "red",     Parent{sys.world}, sf::Color::Red,     {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
-    sys.add(green,   "green",   Parent{sys.world}, sf::Color::Green,   {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
-    // sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
-    auto hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+    std::pair<int, std::vector<size_t>> hierarchy_bfs;
+
     struct SaveData {
         double time_stamp;
         System world_state;
     };
+    
     std::vector<SaveData> saves;
     SaveData latest_save;
-    saves.push_back({0.0, sys});
     const double save_interval = 0.125f;
     double current_time;
-
-   // create the window
-    sf::RenderWindow window(sf::VideoMode(win_size.x, win_size.y), "demo", sf::Style::Close);
-    // window.capture();
-    window.setFramerateLimit(60U);
-    vec2f pos = {300.f, 300.f};
-    vec2f offset = {50.f, 50.f};
-    vec2f axis = normal(vec2f(3.f, 1.f));
-    EPI_LOG_DEBUG << dot(pos, axis) + dot(offset, axis);
-    EPI_LOG_DEBUG << dot(pos + offset, axis);
     
-    if (!ImGui::SFML::Init(window)) return -1;
-    
-    ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
-    sf::Clock delTclock;
     std::vector<vec2f> creation_points;
+    bool setup() override {
+        setConstantFramerate(60);
+        sys.add(yellow,  "yellow",  Parent{sys.world}, sf::Color::Yellow,  {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
+        sys.add(magenta, "magenta", Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
+        sys.add(red,     "red",     Parent{sys.world}, sf::Color::Red,     {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
+        sys.add(green,   "green",   Parent{sys.world}, sf::Color::Green,   {big_aabb.br(), big_aabb.tr(), small_aabb.tr(), small_aabb.br()}, true);
+        // sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
+        hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
+        
+        saves.push_back({0.0, sys});
+        
+        ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
 
-    // run the program as long as the window is open
-    while (window.isOpen()) {
-        // check all the window's events that were triggered since the last
-        // iteration of the loop
-        sf::Event event{};
-        auto delTtime = delTclock.restart();
-        while (window.pollEvent(event)) {
-            ImGui::SFML::ProcessEvent(window, event);
-            // "close requested" event: we close the window
-            if (event.type == sf::Event::Closed)
-                window.close();
-            if(event.type == sf::Event::MouseButtonPressed) {
+        addHook(sf::Event::MouseButtonPressed, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.mouseButton.button == sf::Mouse::Left) {
                     auto mouse_pos = sf::Mouse::getPosition(window);
                     creation_points.push_back((vec2f)mouse_pos);
                 }
-            }
-            if(event.type == sf::Event::KeyPressed) {
+            });
+        addHook(sf::Event::KeyPressed, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::R) {
                     creation_points.clear();
                 }
+            });
+        addHook(sf::Event::KeyPressed, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::Enter) {
                     bool isStat = false;
                     if(event.key.shift) {
@@ -252,34 +214,45 @@ int main() {
                     sys.add(Entity(), "", sys.world, sf::Color::White, creation_points, isStat);
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
+            });
+        addHook(sf::Event::KeyPressed, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::V) {
                     auto mouse_pos = sf::Mouse::getPosition(window);
-                    Entity t;
-                    sys.add(t, "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
+                    sys.add(Entity(), "", Position({static_cast<float>(mouse_pos.x), static_cast<float>(mouse_pos.y)}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
                     // sys.rb_sys.get<Rigidbody::lockRotationFlag>(t) = true;
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
+            });
+        addHook(sf::Event::KeyPressed, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::B) {
                     auto m = model_rect;
                     for(auto& p : m) p *= 0.5f;
-                    auto mouse_pos = (vec2f)sf::Mouse::getPosition(window);
-                    sys.add(Entity(), "", Position(mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
+                    auto mouse_pos = sf::Mouse::getPosition(window);
+                    sys.add(Entity(), "", Position((vec2f)mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
+            });
+        addHook(sf::Event::KeyPressed, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::C) {
                     auto m = model_rect;
                     for(auto& p : m) p *= 1.5f;
-                    auto mouse_pos = (vec2f)sf::Mouse::getPosition(window);
-                    sys.add(Entity(), "", Position(mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
+                    auto mouse_pos = sf::Mouse::getPosition(window);
+                    sys.add(Entity(), "", Position((vec2f)mouse_pos), Rotation(0.f), sys.world, sf::Color::White, m);
                     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy.sliceOwner<Parent>());
                 }
-            }else if(event.type == sf::Event::KeyReleased) {
+            });
+        addHook(sf::Event::KeyReleased, 
+            [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::Dash) {
                     sys = latest_save.world_state;
                 }
-            }
-        }
-        
+            });
+        return true;
+    }
+    void update(sf::Time deltaTime) override final {
         float fixedDeltaTime = 1.f / 60.f;
         // float fixedDeltaTime = delTtime.asSeconds();
         
@@ -300,7 +273,6 @@ int main() {
             latest_save.world_state = sys;
             latest_save.time_stamp = current_time;
         }
-        ImGui::SFML::Update(window, delTtime);
         if(current_time - save_interval > saves.back().time_stamp) {
             EPI_LOG_DEBUG << "saved!";
             saves.push_back({current_time, sys});
@@ -313,12 +285,77 @@ int main() {
         
         updateParentTransformByHierarchy(
             sys.transforms.sliceOwner<LocalTransform, GlobalTransform>(),
-            sys.hierarchy, hierarchy_bfs);
+            sys.hierarchy, hierarchy_bfs.second);
 
         
         static ThreadPool tp;
         sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, fixedDeltaTime /* delTtime.asSeconds() */, tp);
-        window.clear(sf::Color::Black);
+        
+        {
+            auto convertToImVec = [](sf::Vector2f vec) {
+                return ImVec2(vec.x, vec.y);
+            };
+            auto convertToSfVec = [](ImVec2 vec) {
+                return sf::Vector2f(vec.x, vec.y);
+            };
+            auto slider2D = [&](std::string name, sf::Vector2f* vec,
+                                sf::Vector2f min, sf::Vector2f max,
+                                float scale) {
+                ImVec2 tmp = convertToImVec(*vec);
+                InputVec2(name.c_str(), &tmp, min, max, scale);
+                *vec = tmp;
+            };
+            ImGui::Begin("settings");
+            ImGui::Text("ObjectCount: %zu", sys.transforms.size());
+            static constexpr size_t sample_size = 300U;
+            static size_t cur_fps_idx = 0;
+            static std::vector<double> FPS(sample_size);
+            FPS[(cur_fps_idx++) % sample_size] = 1.0 / deltaTime.asSeconds();
+            auto avg_fps = std::reduce(FPS.begin(), FPS.end()) / static_cast<double>(FPS.size());
+            ImGui::Text("FPS: %f", avg_fps);
+            static std::string selected = sys.name_table.begin()->second;
+            ImGui::Dummy({});
+            for (auto [e, name] : sys.name_table) {
+                if(name == "")
+                    continue;;
+                ImGui::SameLine();
+                if (ImGui::Button(name.c_str(), {50.f, 20.f})) {
+                    selected = name;
+                }
+            }
+            for (auto [e, name] : sys.name_table) {
+                if (selected != name) {
+                    // if(sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).has_value())
+                    //     *sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).value() = false;
+                    continue;
+                }
+                *sys.rb_sys.try_get<Rigidbody::Velocity>(e).value() = vec2f();
+                ImGui::BeginChild(("tab " + name).c_str());
+                ImGui::Text("%s", (name + " settings:").c_str());
+                auto& ref_pos =
+                    *sys.transforms.try_get<Position>(e).value();
+                auto height = win_size.y;
+                ref_pos.y = height - ref_pos.y;
+                slider2D(name + " pos", &ref_pos, {0.f, 0.f},
+                         win_size, 1.f);
+                ref_pos.y = height - ref_pos.y;
+
+                auto& ref_scale =
+                    *sys.transforms.try_get<Scale>(e).value();
+                slider2D(name + " scale", &ref_scale, {-2.f, -2.f}, {2.f, 2.f},
+                         1.f);
+
+                auto& ref_rotate =
+                    *sys.transforms.try_get<Rotation>(e).value();
+                float& f = ref_rotate;
+                ImGui::SliderFloat((name + " rotation").c_str(),
+                                   &f, 0.f, M_PI * 2.f);
+                ImGui::EndChild();
+            }
+            ImGui::End();
+        }
+    }
+    virtual void render(sf::RenderTarget& window) override final {
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
         for (auto [e, global_trans] : sys.transforms.sliceOwner<GlobalTransform>()) {
@@ -363,79 +400,13 @@ int main() {
                 }
             }
         }
-        
-        {
-            auto convertToImVec = [](sf::Vector2f vec) {
-                return ImVec2(vec.x, vec.y);
-            };
-            auto convertToSfVec = [](ImVec2 vec) {
-                return sf::Vector2f(vec.x, vec.y);
-            };
-            auto slider2D = [&](std::string name, sf::Vector2f* vec,
-                                sf::Vector2f min, sf::Vector2f max,
-                                float scale) {
-                ImVec2 tmp = convertToImVec(*vec);
-                InputVec2(name.c_str(), &tmp, min, max, scale);
-                *vec = tmp;
-            };
-            ImGui::Begin("settings");
-            ImGui::Text("ObjectCount: %zu", sys.transforms.size());
-            static constexpr size_t sample_size = 300U;
-            static size_t cur_fps_idx = 0;
-            static std::vector<double> FPS(sample_size);
-            FPS[(cur_fps_idx++) % sample_size] = 1.0 / delTtime.asSeconds();
-            auto avg_fps = std::reduce(FPS.begin(), FPS.end()) / static_cast<double>(FPS.size());
-            ImGui::Text("FPS: %f", avg_fps);
-            static std::string selected = sys.name_table.begin()->second;
-            ImGui::Dummy({});
-            for (auto [e, name] : sys.name_table) {
-                if(name == "")
-                    continue;;
-                ImGui::SameLine();
-                if (ImGui::Button(name.c_str(), {50.f, 20.f})) {
-                    selected = name;
-                }
-            }
-            for (auto [e, name] : sys.name_table) {
-                if (selected != name) {
-                    // if(sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).has_value())
-                    //     *sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).value() = false;
-                    continue;
-                }
-                *sys.rb_sys.try_get<Rigidbody::Velocity>(e).value() = vec2f();
-                ImGui::BeginChild(("tab " + name).c_str());
-                ImGui::Text("%s", (name + " settings:").c_str());
-                auto& ref_pos =
-                    *sys.transforms.try_get<Position>(e).value();
-                auto height = window.getView().getSize().y;
-                ref_pos.y = height - ref_pos.y;
-                slider2D(name + " pos", &ref_pos, {0.f, 0.f},
-                         {window.getView().getSize()}, 1.f);
-                ref_pos.y = height - ref_pos.y;
-
-                auto& ref_scale =
-                    *sys.transforms.try_get<Scale>(e).value();
-                slider2D(name + " scale", &ref_scale, {-2.f, -2.f}, {2.f, 2.f},
-                         1.f);
-
-                auto& ref_rotate =
-                    *sys.transforms.try_get<Rotation>(e).value();
-                float& f = ref_rotate;
-                ImGui::SliderFloat((name + " rotation").c_str(),
-                                   &f, 0.f, M_PI * 2.f);
-                ImGui::EndChild();
-            }
-            ImGui::End();
-        }
-        ImGui::SFML::Render(window);
-
-        // draw everything here...
-        // window.draw(...);
-
-        // end the current frame
-        window.display();
     }
+    Demo() : Application("demo", {800, 800}) {}
+};
 
+int main() {
+    Demo demo;
+    demo.run();
     return 0;
 }
 using namespace ImGui;
