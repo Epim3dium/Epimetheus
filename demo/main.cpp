@@ -204,7 +204,7 @@ int main() {
     std::vector<SaveData> saves;
     SaveData latest_save;
     saves.push_back({0.0, sys});
-    const double save_interval = 0.5f;
+    const double save_interval = 0.125f;
     double current_time;
 
    // create the window
