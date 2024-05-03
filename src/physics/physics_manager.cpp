@@ -110,7 +110,7 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
             auto [idx1, idx2] = col_list[i];
             auto [shape1] = *(shapes.begin() + idx1);
             auto [shape2] = *(shapes.begin() + idx2);
-            auto col_infos = _solver->detect(shape1, shape2);
+            auto col_infos = m_solver->detect(shape1, shape2);
             result[i] = col_infos;
         }
     });
@@ -135,9 +135,9 @@ void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
         float mult1 = isStatic2 ? 1.f : denom * pressure2;
         float mult2 = isStatic1 ? 1.f : denom * pressure1;
         for(const auto& info : col_info[i]) {
-            auto [off1, off2] = _solver->solveOverlap(info, isStatic1, pos1, isStatic2, pos2);
-            pos1 += off1 * mult1;
-            pos2 += off2 * mult2;
+            auto [off1, off2] = m_solver->solveOverlap(info, isStatic1, pos1, isStatic2, pos2);
+            pos1 += off1;
+            pos2 += off2;
         }
     }
 }
@@ -154,6 +154,7 @@ std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(
     }
     return selected_properties;
 }
+#define VERY_SMALL_NUMBER (0.01)
 void PhysicsManager::processReactions(float delT, 
                     Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
                       AngularVelocity, InertiaDevMass, Position> react_info,
@@ -161,6 +162,9 @@ void PhysicsManager::processReactions(float delT,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
                       const std::vector<ColParticipants>& col_list) const 
 {
+    static int ticks_passed = 0;
+    ticks_passed++;
+    
     assert(mat_info.size() == col_info.size());
     assert(col_info.size() == col_list.size());
     for(int i = 0; i < col_list.size(); i++) {
@@ -193,34 +197,43 @@ void PhysicsManager::processReactions(float delT,
             inv_inertia2 = 0.f;
         }
         
-        static constexpr float Slop = 0.00005;
+        const float Slop = VERY_SMALL_NUMBER / static_cast<float>(this->steps);
         for(const auto& info : col_info[i]) {
             if(info.overlap < Slop || !info.detected) {
                 continue;
             }
-            auto rad1 = info.contact_point - pos1;
-            auto rad2 = info.contact_point - pos2;
             
-            auto reaction = _solver->processReaction(info.contact_normal, sfric, dfric, bounce, 
-                    inv_inertia1, mass1, rad1, vel1, angvel1, 
-                    inv_inertia2, mass2, rad2, vel2, angvel2);
-            
-            if(!isStatic1) {
-                vel1 += reaction.vel_change1;
-                if(!lockRot1) {
-                    angvel1 += reaction.angvel_change1;
-                }
+            std::vector<vec2f> cps;
+            if(ticks_passed % 2 == 0) {
+                cps = std::vector<vec2f>(info.contact_points.begin(), info.contact_points.end());
+            }else {
+                cps = std::vector<vec2f>(info.contact_points.rbegin(), info.contact_points.rend());
             }
-            if(!isStatic2) {
-                vel2 += reaction.vel_change2;
-                if(!lockRot2) {
-                    angvel2 += reaction.angvel_change2;
+            
+            for(auto contact_point : cps) {
+                auto rad1 = contact_point - pos1;
+                auto rad2 = contact_point - pos2;
+                
+                auto reaction = m_solver->processReaction(info.contact_normal, sfric, dfric, bounce, 
+                        inv_inertia1, mass1, rad1, vel1, angvel1, 
+                        inv_inertia2, mass2, rad2, vel2, angvel2);
+                
+                if(!isStatic1) {
+                    vel1 += reaction.vel_change1;
+                    if(!lockRot1) {
+                        angvel1 += reaction.angvel_change1;
+                    }
+                }
+                if(!isStatic2) {
+                    vel2 += reaction.vel_change2;
+                    if(!lockRot2) {
+                        angvel2 += reaction.angvel_change2;
+                    }
                 }
             }
         }
     }
 }
-#define VERY_SMALL_NUMBER (0.01)
 void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipants>& col_list, ThreadPool& tp) const {
     auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), col_list, tp);
     std::vector<float> pressure_list(colliding.size(), VERY_SMALL_NUMBER);

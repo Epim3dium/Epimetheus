@@ -63,7 +63,7 @@ private:
     }
     typedef std::pair<size_t, size_t> ColParticipants;
 
-    std::shared_ptr<SolverInterface> _solver =
+    std::shared_ptr<SolverInterface> m_solver =
         std::make_shared<DefaultSolver>();
 
     std::vector<ColParticipants> processBroadPhase(OwnerSlice<ShapeTransformedPartitioned> slice) const;
@@ -114,7 +114,7 @@ private:
 
 public :
     // number of physics/collision steps per frame
-    size_t steps = 8U;
+    size_t steps = 32U;
 
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
@@ -127,7 +127,7 @@ public :
 
     template <class T>
     inline void bind() {
-        _solver = std::make_unique<T>();
+        m_solver = std::make_unique<T>();
     }
     // size should be max simulated size
     PhysicsManager() {}

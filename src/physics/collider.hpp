@@ -18,7 +18,7 @@ namespace epi {
 struct CollisionInfo {
     bool detected;
     vec2f contact_normal;
-    vec2f contact_point;
+    std::vector<vec2f> contact_points;
     float overlap;
 };
 struct ColliderEvent {

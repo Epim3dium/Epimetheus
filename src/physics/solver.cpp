@@ -17,7 +17,8 @@ namespace epi {
 CollisionInfo detectOverlap(const std::vector<vec2f>& p1, const std::vector<vec2f>& p2) {
     auto intersection = intersectPolygonPolygon(p1, p2);
     if(intersection.detected) {
-        return {true, intersection.contact_normal, intersection.cp, intersection.overlap};
+        auto cps = findContactPoints(p1, p2);
+        return {true, intersection.contact_normal, cps, intersection.overlap};
     }
     return {false};
 }
@@ -27,24 +28,24 @@ DefaultSolver::ReactionResponse DefaultSolver::processReaction(vec2f cn, float s
         float inv_inertia2, float mass2, vec2f rad2, vec2f vel2, float ang_vel2) {
 
     
-    vec2f rad1perp(-rad1.y, rad1.x);
-    vec2f rad2perp(-rad2.y, rad2.x);
+    const vec2f rad1perp(-rad1.y, rad1.x);
+    const vec2f rad2perp(-rad2.y, rad2.x);
 
-    vec2f p1ang_vel_lin = rad1perp * ang_vel1;
-    vec2f p2ang_vel_lin = rad2perp * ang_vel2;
+    const vec2f p1ang_vel_lin = rad1perp * ang_vel1;
+    const vec2f p2ang_vel_lin = rad2perp * ang_vel2;
 
-    vec2f vel_sum1 = vel1 + p1ang_vel_lin;
-    vec2f vel_sum2 = vel2 + p2ang_vel_lin;
+    const vec2f vel_sum1 = vel1 + p1ang_vel_lin;
+    const vec2f vel_sum2 = vel2 + p2ang_vel_lin;
 
     //calculate relative velocity
-    vec2f rel_vel = vel_sum2 - vel_sum1;
+    const vec2f rel_vel = vel_sum2 - vel_sum1;
     if (dot(rel_vel, cn) < 0.f)
     {
         return {vec2f(), 0.f, vec2f(), 0.f};
     }
 
-    float j = getReactImpulse(rad1perp, inv_inertia1, mass1, rad2perp, inv_inertia2, mass2, bounce, rel_vel, cn);
-    vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
+    const float j = getReactImpulse(rad1perp, inv_inertia1, mass1, rad2perp, inv_inertia2, mass2, bounce, rel_vel, cn);
+    const vec2f fj = getFricImpulse(inv_inertia1, mass1, rad1perp, inv_inertia2, mass2, rad2perp, sfric, dfric, j, rel_vel, cn);
     vec2f impulse = cn * j - fj;
     if(nearlyEqual(j, 0.f)) {
         impulse = vec2f(0, 0);
@@ -60,12 +61,12 @@ DefaultSolver::ReactionResponse DefaultSolver::processReaction(vec2f cn, float s
 }
 float DefaultSolver::getReactImpulse(const vec2f& rad1perp, float p1inv_inertia, float mass1, const vec2f& rad2perp, float p2inv_inertia, float mass2, 
         float restitution, const vec2f& rel_vel, vec2f cn) {
-    float contact_vel_mag = dot(rel_vel, cn);
+    const float contact_vel_mag = dot(rel_vel, cn);
     //equation from net
-    float r1perp_dotN = dot(rad1perp, cn);
-    float r2perp_dotN = dot(rad2perp, cn);
+    const float r1perp_dotN = dot(rad1perp, cn);
+    const float r2perp_dotN = dot(rad2perp, cn);
 
-    float denom = 1.f / mass1 + 1.f / mass2 +
+    const float denom = 1.f / mass1 + 1.f / mass2 +
         (r1perp_dotN * r1perp_dotN) *  p1inv_inertia +
         (r2perp_dotN * r2perp_dotN) *  p2inv_inertia;
 
@@ -83,15 +84,15 @@ vec2f DefaultSolver::getFricImpulse(float p1inv_inertia, float mass1, vec2f rad1
     tangent = normal(tangent);
 
     //equation from net
-    float r1perp_dotT = dot(rad1perp, tangent);
-    float r2perp_dotT = dot(rad2perp, tangent);
+    const float r1perp_dotT = dot(rad1perp, tangent);
+    const float r2perp_dotT = dot(rad2perp, tangent);
 
-    float denom = 1.f / mass1 + 1.f / mass2 + 
+    const float denom = 1.f / mass1 + 1.f / mass2 + 
         (r1perp_dotT * r1perp_dotT) *  p1inv_inertia +
         (r2perp_dotT * r2perp_dotT) *  p2inv_inertia;
 
 
-    float contact_vel_mag = dot(rel_vel, tangent);
+    const float contact_vel_mag = dot(rel_vel, tangent);
     float jt = -contact_vel_mag;
     jt /= denom;
 
@@ -120,10 +121,11 @@ std::pair<vec2f, vec2f> DefaultSolver::solveOverlap(const CollisionInfo& info,
     if(!info.detected || (isStatic1 && isStatic2))
         return {};
 
-    constexpr float response_coef = 0.5f;
+    constexpr float response_coef = 0.9f;
+    
     const float offset = info.overlap * response_coef;
-
-    vec2f push_out = info.contact_normal * offset;
+    const vec2f push_out = info.contact_normal * offset;
+    
     if(isStatic2) {
         return {push_out, vec2f(0, 0)};
     } else if(isStatic1) {
@@ -132,12 +134,5 @@ std::pair<vec2f, vec2f> DefaultSolver::solveOverlap(const CollisionInfo& info,
         return {push_out / 2.f, -push_out / 2.f}; 
     }
 }
-// void DefaultSolver::solve(CollisionInfo man, RigidManifold rb1, RigidManifold rb2, float restitution, float sfriction, float dfriction)  {
-//     if(!man.detected) {
-//         return;
-//     }
-//     handleOverlap(rb1, rb2, man);
-//     processReaction(man, rb1, rb2, restitution, sfriction, dfriction);
-// }
 
 }
