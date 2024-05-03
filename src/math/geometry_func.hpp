@@ -20,13 +20,15 @@ vec2f findClosestPointOnEdge(vec2f point, const std::vector<vec2f>& poly);
 std::vector<vec2f> findContactPointFast(const ConvexPolygon* p0, const ConvexPolygon* p1, vec2f cn);
 //returns all of contact points of 2 polygons
 std::vector<vec2f> findContactPoints(const ConvexPolygon& r1, const ConvexPolygon& r2);
+std::vector<vec2f> findContactPoints(const std::vector<vec2f>& p0, const std::vector<vec2f>& p1);
 //calculates area of polygon whose center should be at {0, 0}
 float area(const std::vector<vec2f>& model);
 vec2f centerOfMass(std::vector<vec2f> model);
 //returns true if a and b are nearly equal
-bool nearlyEqual(float a, float b);
+#define VERY_SMALL_AMOUNT 0.001f
+bool nearlyEqual(float a, float b, float dt = VERY_SMALL_AMOUNT);
 //returns true if a and b are nearly equal
-bool nearlyEqual(vec2f a, vec2f b);
+bool nearlyEqual(vec2f a, vec2f b, float dt = VERY_SMALL_AMOUNT);
 
 //returns true if p is within aabb
 bool isOverlappingPointAABB(const vec2f& p, const AABB& r) ;
@@ -103,7 +105,7 @@ struct IntersectionPolygonPolygonResult {
     bool detected;
     vec2f contact_normal;
     float overlap;
-    vec2f cp;
+    std::vector<vec2f> cp;
 };
 /**
  * Calculates all information connected to Polygon and Polygon intersection

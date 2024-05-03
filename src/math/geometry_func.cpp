@@ -488,12 +488,11 @@ vec2f findClosestPointOnEdge(vec2f point, const std::vector<vec2f>& points) {
     }
     return closest;
 }
-#define VERY_SMALL_AMOUNT 0.001f
-bool nearlyEqual(float a, float b) {
-    return abs(a - b) < VERY_SMALL_AMOUNT;
+bool nearlyEqual(float a, float b, float dt) {
+    return abs(a - b) < dt;
 }
-bool nearlyEqual(vec2f a, vec2f b) {
-    return nearlyEqual(a.x, b.x) && nearlyEqual(a.y, b.y);
+bool nearlyEqual(vec2f a, vec2f b, float dt) {
+    return nearlyEqual(a.x, b.x, dt) && nearlyEqual(a.y, b.y, dt);
 }
 std::vector<vec2f> findContactPointFast(const ConvexPolygon* p0, const ConvexPolygon* p1, vec2f cn) {
     float best = 0.f;
@@ -521,9 +520,9 @@ std::vector<vec2f> findContactPointFast(const ConvexPolygon* p0, const ConvexPol
 
 }
 
-std::vector<vec2f> findContactPoints(const ConvexPolygon& p0, const ConvexPolygon& p1) {
+std::vector<vec2f> findContactPoints(const std::vector<vec2f>& p0, const std::vector<vec2f>& p1) {
     std::vector<vec2f> result;
-    const ConvexPolygon* poly[] = {&p0, &p1};
+    const std::vector<vec2f>* poly[] = {&p0, &p1};
     struct Seg {
         char polyID;
         float x_pos;
@@ -534,13 +533,13 @@ std::vector<vec2f> findContactPoints(const ConvexPolygon& p0, const ConvexPolygo
     };
     std::vector<Seg> all;
     std::vector<Seg> open[2];
-    all.reserve(p1.getVertecies().size() * 2 + p0.getVertecies().size() * 2 );
-    open[0].reserve(p0.getVertecies().size());
-    open[1].reserve(p1.getVertecies().size());
+    all.reserve(p1.size() * 2 + p0.size() * 2 );
+    open[0].reserve(p0.size());
+    open[1].reserve(p1.size());
     size_t cur_id = 0;
     for(char i = 0; i < 2; i++) {
-        auto prev = poly[i]->getVertecies().back();
-        for(auto p : poly[i]->getVertecies()) {
+        auto prev = poly[i]->back();
+        for(auto p : *poly[i]) {
             auto mi = std::min(prev.x, p.x);
             auto mx = std::max(prev.x, p.x);
             all.push_back({i, mi, cur_id, false, Ray::CreatePoints(prev, p)});
@@ -576,6 +575,9 @@ std::vector<vec2f> findContactPoints(const ConvexPolygon& p0, const ConvexPolygo
     }
     return result;
 }
+std::vector<vec2f> findContactPoints(const ConvexPolygon& p0, const ConvexPolygon& p1) {
+    return findContactPoints(p0.getVertecies(), p1.getVertecies());
+}
 vec2f centerOfMass(std::vector<vec2f> model) {
     vec2f inside = std::reduce(model.begin(), model.end()) / static_cast<float>(model.size());
     vec2f sum_avg = {0, 0};
@@ -600,6 +602,14 @@ float area(const std::vector<vec2f>& model) {
     }
     return abs(area / 2.0);
 }
+struct ProjectionResult {
+    float min;
+    std::vector<vec2f> min_points;
+    float max;
+    std::vector<vec2f> max_points;
+};
+// std::pair<float, float> calcProjectionPolygon(const std::vector<vec2f>&r, vec2f projectionAxis) {
+// }
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
     const std::vector<vec2f>* verticies[] = {&r1, &r2};
 
@@ -607,7 +617,7 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
     vec2f cn;
 
     //calculate contact point only after finding max penetration
-    std::pair<std::array<vec2f, 2U>, int> cp_calc_info;
+    std::pair<std::vector<vec2f>, int> cp_calc_info;
     
     for (int poly1 = 0; poly1 < 2; poly1++) {
         auto poly2 = !poly1;
@@ -615,6 +625,7 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
         auto prev = verticies[poly1]->back();
         for (auto vert : *verticies[poly1]) {
             vec2f perp = vert - prev;
+            prev = vert;
             vec2f axisProj = { -perp.y, perp.x };
             axisProj *=  (poly1 == 0 ? 1.f : -1.f);
             
@@ -632,61 +643,60 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
             }
 
             float min_r2 = INFINITY, max_r2 = -INFINITY;
-            std::array<vec2f, 2U> min_p2, max_p2;
+            std::vector<vec2f> min_p2, max_p2;
             for (auto p : *verticies[poly2]) {
                 float q = dot(p, axisProj);
                 
                 //additional if statements to find if edge is almost parallel to axisProj edge
-                if(nearlyEqual(q, min_r2)) {
-                    min_r2 = (q + min_r2) / 2.f;
-                    min_p2[1] = p;
+                if(nearlyEqual(q, min_r2, 0.01f)) {
+                    min_p2.push_back(p);
+                    min_r2 = (q + min_r2 * (min_p2.size() - 1)) / min_p2.size();
                 }else if(q < min_r2) {
                     min_r2 = q;
-                    min_p2 = {p, p};
+                    min_p2 = {p};
                 }
                 
-                if(nearlyEqual(q, max_r2)) {
-                    max_r2 = (q + max_r2) / 2.f;
-                    max_p2[1] = p;
+                if(nearlyEqual(q, max_r2, 0.01f)) {
+                    max_p2.push_back(p);
+                    max_r2 = (q + max_r2 * (max_p2.size() - 1)) / max_p2.size();
                 }
                 else if(q > max_r2) {
                     max_r2 = q;
-                    max_p2 = {p, p};
+                    max_p2 = {p};
                 }
             }
 
             // Calculate actual overlap along projected axis, and store the minimum
             auto minmax = std::min(max_r1, max_r2);
             auto maxmin = std::max(min_r1, min_r2); 
-            if(minmax - maxmin < overlap && minmax - maxmin >= 0.f ) {
-                overlap = minmax - maxmin;
-                
-                cn = axisProj;
-                if(poly1 == 1)
-                    cn *= -1.f;
-                
-                if(minmax == max_r2) {
-                    cp_calc_info = {max_p2, poly1};
-                }else {
-                    cp_calc_info = {min_p2, poly1};
-                    cn *= -1.f;
-                }
-            }
             if (!(max_r2 >= min_r1 && max_r1 >= min_r2))
                 return {false};
-            prev = vert;
+            if(!(minmax - maxmin < overlap && minmax - maxmin >= 0.f)) {
+                continue;
+            }
+            overlap = minmax - maxmin;
+            
+            cn = axisProj;
+            if(poly1 == 1)
+                cn *= -1.f;
+            
+            if(minmax == max_r2) {
+                cp_calc_info = {max_p2, poly1};
+            }else {
+                cp_calc_info = {min_p2, poly1};
+                cn *= -1.f;
+            }
         }
     }
     if(overlap <= 0.f) {
         return {false};
     }
-    vec2f cp = {0, 0};
+    std::vector<vec2f> collision_points;
     for(auto p : cp_calc_info.first) {
-        cp += findClosestPointOnEdge(p, *verticies[cp_calc_info.second]);
+        collision_points.push_back(findClosestPointOnEdge(p, *verticies[cp_calc_info.second]));
     }
-    cp /= 2.f;
 
-    return {true, cn, overlap, cp};
+    return {true, cn, overlap, collision_points};
 }
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const ConvexPolygon &r1, const ConvexPolygon &r2) {
     return intersectPolygonPolygon(r1.getVertecies(), r2.getVertecies());
