@@ -29,6 +29,7 @@ class TaskQueue {
         m_cond.wait(lk);
     }
     void wakeUpAll() {
+        m_mutex.unlock();
         m_cond.notify_all();
     }
     void workDone() {
