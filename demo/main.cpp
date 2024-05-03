@@ -58,6 +58,7 @@ struct System {
         color_table[id] = color;
         
         auto area = epi::area(model);
+        area = 1.f;
         rb_sys.push_back(id, Rigidbody::isStaticFlag(false), Rigidbody::Mass(area));
         mat_sys.push_back(id);
         col_sys.push_back(id, model);
@@ -75,6 +76,7 @@ struct System {
         hierarchy.try_get<Hierarchy::Children>(parent).value()->push_back(id);
         color_table[id] = color;
         auto area = epi::area(points);
+        area = 1.f;
         rb_sys.push_back(id, Rigidbody::isStaticFlag(isStatic), Rigidbody::Mass(area));
         mat_sys.push_back(id);
         col_sys.push_back(id, points);
@@ -174,7 +176,7 @@ public:
     
     std::vector<SaveData> saves;
     SaveData latest_save;
-    const double save_interval = 0.125f;
+    const double save_interval = 0.5f;
     double current_time;
     
     std::vector<vec2f> creation_points;
@@ -253,11 +255,10 @@ public:
         return true;
     }
     void update(sf::Time deltaTime) override final {
-        float fixedDeltaTime = 1.f / 60.f;
         // float fixedDeltaTime = delTtime.asSeconds();
         
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Dash)) {
-            current_time -= fixedDeltaTime * 2.f; 
+            current_time -= deltaTime.asSeconds() * 2.f; 
             while(current_time < saves.back().time_stamp) {
                 latest_save = saves.back();
                 sys = latest_save.world_state;
@@ -277,7 +278,7 @@ public:
             EPI_LOG_DEBUG << "saved!";
             saves.push_back({current_time, sys});
         }
-        current_time += fixedDeltaTime;
+        current_time += deltaTime.asSeconds();
 
         // clear the window with black color
         
@@ -289,7 +290,7 @@ public:
 
         
         static ThreadPool tp;
-        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, fixedDeltaTime /* delTtime.asSeconds() */, tp);
+        sys.phy_man.update(sys.transforms, sys.rb_sys, sys.col_sys, sys.mat_sys, deltaTime.asSeconds() /* delTtime.asSeconds() */, tp);
         
         {
             auto convertToImVec = [](sf::Vector2f vec) {
@@ -307,9 +308,10 @@ public:
             };
             ImGui::Begin("settings");
             ImGui::Text("ObjectCount: %zu", sys.transforms.size());
+            
             static constexpr size_t sample_size = 300U;
             static size_t cur_fps_idx = 0;
-            static std::vector<double> FPS(sample_size);
+            static std::vector<double> FPS(sample_size, 1.0 / deltaTime.asSeconds());
             FPS[(cur_fps_idx++) % sample_size] = 1.0 / deltaTime.asSeconds();
             auto avg_fps = std::reduce(FPS.begin(), FPS.end()) / static_cast<double>(FPS.size());
             ImGui::Text("FPS: %f", avg_fps);
