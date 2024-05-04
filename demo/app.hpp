@@ -27,7 +27,7 @@ protected:
     }
     virtual void update(sf::Time deltaTime) {
     }
-    virtual void render(sf::RenderTarget& window) {
+    virtual void render(sf::RenderWindow& window) {
     }
     virtual void cleanup() {
     }
