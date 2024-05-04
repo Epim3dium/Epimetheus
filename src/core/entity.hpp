@@ -10,6 +10,7 @@ private:
         return s_id++;
     }
 public:
+    const char* name;
     inline const uint32_t operator()() const {
         return id;
     }
@@ -25,7 +26,12 @@ public:
     inline bool operator!=(const Entity& other) const {
         return id != other();
     }
-    Entity() : id(getNextId()) {}
+    inline static Entity invalid() {
+        static const Entity invalid("invalid Entity");
+        return invalid;
+    };
+    Entity() : id(getNextId()), name("unnamed entity") {}
+    Entity(const char* name_) : id(getNextId()), name(name_) {}
     Entity(const Entity& other) = default;
     Entity(Entity&& other) = default;
     Entity& operator=(const Entity& other) = default;
