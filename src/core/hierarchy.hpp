@@ -10,9 +10,14 @@ namespace Hierarchy {
 EPI_WRAP_TYPE(Entity, Parent);
 EPI_WRAP_TYPE(std::vector<Entity>, Children);
 
-typedef Group<Parent, Children> System;
+struct System : Group<Parent, Children> {
+    System() {
+        setDefault<Parent>(Entity::invalid());
+    }
+};
 //returns pair : max_depth, BFS_path
-std::pair<int, std::vector<size_t> > getBFSIndexList(OwnerSlice<Parent> slice);
+std::vector<size_t> getBFSIndexList(OwnerSlice<Parent> slice);
+std::vector<size_t> getDFSIndexList(OwnerSlice<Parent, Children> slice);
 
 }
 }

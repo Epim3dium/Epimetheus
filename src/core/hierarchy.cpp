@@ -1,9 +1,37 @@
 #include "hierarchy.hpp"
 #include <map>
+#include <stack>
 namespace epi {
 namespace Hierarchy {
     
-std::pair<int, std::vector<size_t> > getBFSIndexList(OwnerSlice<Parent> slice) {
+std::vector<size_t> getDFSIndexList(OwnerSlice<Parent, Children> slice) {
+    std::vector<size_t> path;
+    int max_depth = -1;
+    Entity first = Entity::invalid();
+    for (auto [id, parent, children] : slice) {
+        if(parent != Entity::invalid()) {
+            continue;
+        }
+        first = id;
+        break;
+    }
+    assert(first != Entity::invalid() && "no root");
+    
+    std::stack<Entity> open;
+    open.push(first);
+    
+    while(open.size() != 0) {
+        Entity current_entity = open.top();
+        size_t index = slice.getIndex(current_entity).value();
+        open.pop();
+        path.push_back(index);
+        for(auto c : slice.get<Hierarchy::Children>(current_entity)) {
+            open.push(c);
+        }
+    }
+    return path;
+}
+std::vector<size_t> getBFSIndexList(OwnerSlice<Parent> slice) {
     std::vector<size_t> path;
     int max_depth = -1;
     
@@ -14,7 +42,7 @@ std::pair<int, std::vector<size_t> > getBFSIndexList(OwnerSlice<Parent> slice) {
     size_t idx = 0;
     for (auto [id, parent] : slice) {
         int my_layer;
-        if (id == parent) {
+        if (parent == Entity::invalid()) {
             my_layer = 0;
         } else {
             my_layer = layer_values.at(parent) + 1;
@@ -43,7 +71,7 @@ std::pair<int, std::vector<size_t> > getBFSIndexList(OwnerSlice<Parent> slice) {
         cur_path_node = path[cur_path_node];
         index_list[i] = cur_path_node;
     }
-    return {max_depth, index_list};
+    return index_list;
 }
 }
 
