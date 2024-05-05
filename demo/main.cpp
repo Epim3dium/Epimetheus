@@ -40,7 +40,6 @@ struct System {
     Rigidbody::System rigidbody_sys;
     Collider::System collider_sys;
     Material::System material_sys;
-    Constraint::System constraint_sys;
     PhysicsManager phy_man;
     Entity world = Entity("world");
     std::unordered_map<Entity, sf::Color> color_table;
@@ -466,7 +465,7 @@ public:
 
         
         static ThreadPool tp;
-        sys.phy_man.update(sys.transform_sys, sys.rigidbody_sys, sys.collider_sys, sys.material_sys, sys.constraint_sys, fixedDeltaTime /* delTtime.asSeconds() */, tp);
+        sys.phy_man.update(sys.transform_sys, sys.rigidbody_sys, sys.collider_sys, sys.material_sys, fixedDeltaTime /* delTtime.asSeconds() */, tp);
         
         {
             ImGui::Begin("settings");
