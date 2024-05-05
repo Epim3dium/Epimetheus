@@ -610,6 +610,88 @@ struct ProjectionResult {
 };
 // std::pair<float, float> calcProjectionPolygon(const std::vector<vec2f>&r, vec2f projectionAxis) {
 // }
+struct IntersetionPolygonPolygonAxis {
+    std::vector<vec2f> cp_calc_info;
+    bool detected = false;
+    float overlap = INFINITY;
+    vec2f cn;
+    bool continue_calc  = true;
+};
+IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, vec2f axisProj, bool flipAxis = false) {
+    if(flipAxis)
+        axisProj *= -1.f;
+    IntersetionPolygonPolygonAxis result;
+    float overlap = INFINITY;
+    vec2f cn;
+
+    //calculate contact point only after finding max penetration
+    std::vector<vec2f> cp_calc_info;
+    // Work out min and max 1D points for r1
+    float min_dist = INFINITY;
+    float min_r1 = INFINITY, max_r1 = -INFINITY;
+    for (auto p : poly1) {
+        float q = dot(p, axisProj);
+        min_r1 = std::min(min_r1, q);
+        max_r1 = std::max(max_r1, q);
+    }
+
+    float min_r2 = INFINITY, max_r2 = -INFINITY;
+    std::vector<vec2f> min_p2, max_p2;
+    for (auto p : poly2) {
+        float q = dot(p, axisProj);
+        
+        //additional if statements to find if edge is almost parallel to axisProj edge
+        if(nearlyEqual(q, min_r2, 0.01f)) {
+            min_p2.push_back(p);
+            min_r2 = (q + min_r2 * (min_p2.size() - 1)) / min_p2.size();
+        }else if(q < min_r2) {
+            min_r2 = q;
+            min_p2 = {p};
+        }
+        
+        if(nearlyEqual(q, max_r2, 0.01f)) {
+            max_p2.push_back(p);
+            max_r2 = (q + max_r2 * (max_p2.size() - 1)) / max_p2.size();
+        }
+        else if(q > max_r2) {
+            max_r2 = q;
+            max_p2 = {p};
+        }
+    }
+
+    // Calculate actual overlap along projected axis, and store the minimum
+    auto minmax = std::min(max_r1, max_r2);
+    auto maxmin = std::max(min_r1, min_r2); 
+    if (!(max_r2 >= min_r1 && max_r1 >= min_r2)) {
+        result.continue_calc = false;
+        return result;
+    }
+    if(!(minmax - maxmin < overlap && minmax - maxmin >= 0.f)) {
+        result.detected = false;
+        return result;
+    }
+    overlap = minmax - maxmin;
+    
+    cn = axisProj;
+    if(flipAxis)
+        cn *= -1.f;
+    
+    if(minmax == max_r2) {
+        cp_calc_info = max_p2;
+    }else {
+        cp_calc_info = min_p2;
+        cn *= -1.f;
+    }
+    return {cp_calc_info, true, overlap, cn, true};
+}
+IntersectionPolygonPolygonResult intersectPolygonPolygonUsingAxis(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, const vec2f axisProj) {
+    auto tmp = intersectPolygonPolygonUsingAxisHelper(poly1, poly2, axisProj);
+    std::vector<vec2f> collision_points;
+    for(auto p : tmp.cp_calc_info) {
+        collision_points.push_back(findClosestPointOnEdge(p, poly1));
+    }
+    return {tmp.detected && !tmp.continue_calc, axisProj, tmp.overlap, collision_points};
+}
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
     const std::vector<vec2f>* verticies[] = {&r1, &r2};
 
@@ -627,65 +709,22 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
             vec2f perp = vert - prev;
             prev = vert;
             vec2f axisProj = { -perp.y, perp.x };
-            axisProj *=  (poly1 == 0 ? 1.f : -1.f);
+            axisProj = normal(axisProj);
+            auto t = intersectPolygonPolygonUsingAxisHelper(*verticies[poly1], *verticies[poly2], axisProj, poly1);
             
-            // Optional normalisation of projection axis enhances stability slightly
-            float d = sqrtf(axisProj.x * axisProj.x + axisProj.y * axisProj.y);
-            axisProj = { axisProj.x / d, axisProj.y / d };
-
-            // Work out min and max 1D points for r1
-            float min_dist = INFINITY;
-            float min_r1 = INFINITY, max_r1 = -INFINITY;
-            for (auto p : *verticies[poly1]) {
-                float q = dot(p, axisProj);
-                min_r1 = std::min(min_r1, q);
-                max_r1 = std::max(max_r1, q);
-            }
-
-            float min_r2 = INFINITY, max_r2 = -INFINITY;
-            std::vector<vec2f> min_p2, max_p2;
-            for (auto p : *verticies[poly2]) {
-                float q = dot(p, axisProj);
-                
-                //additional if statements to find if edge is almost parallel to axisProj edge
-                if(nearlyEqual(q, min_r2, 0.01f)) {
-                    min_p2.push_back(p);
-                    min_r2 = (q + min_r2 * (min_p2.size() - 1)) / min_p2.size();
-                }else if(q < min_r2) {
-                    min_r2 = q;
-                    min_p2 = {p};
-                }
-                
-                if(nearlyEqual(q, max_r2, 0.01f)) {
-                    max_p2.push_back(p);
-                    max_r2 = (q + max_r2 * (max_p2.size() - 1)) / max_p2.size();
-                }
-                else if(q > max_r2) {
-                    max_r2 = q;
-                    max_p2 = {p};
-                }
-            }
-
-            // Calculate actual overlap along projected axis, and store the minimum
-            auto minmax = std::min(max_r1, max_r2);
-            auto maxmin = std::max(min_r1, min_r2); 
-            if (!(max_r2 >= min_r1 && max_r1 >= min_r2))
+            if(!t.continue_calc) {
                 return {false};
-            if(!(minmax - maxmin < overlap && minmax - maxmin >= 0.f)) {
+            }
+            if(!t.detected) {
                 continue;
             }
-            overlap = minmax - maxmin;
-            
-            cn = axisProj;
-            if(poly1 == 1)
-                cn *= -1.f;
-            
-            if(minmax == max_r2) {
-                cp_calc_info = {max_p2, poly1};
-            }else {
-                cp_calc_info = {min_p2, poly1};
-                cn *= -1.f;
+            if(overlap < t.overlap) {
+                continue;
             }
+            
+            overlap = t.overlap;
+            cn = t.cn;
+            cp_calc_info = {t.cp_calc_info, poly1};
         }
     }
     if(overlap <= 0.f) {
