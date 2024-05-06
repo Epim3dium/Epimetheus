@@ -692,6 +692,44 @@ IntersectionPolygonPolygonResult intersectPolygonPolygonUsingAxis(const std::vec
     }
     return {tmp.detected && !tmp.continue_calc, axisProj, tmp.overlap, collision_points};
 }
+std::pair<vec2f, bool> calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
+    const std::vector<vec2f>* verticies[] = {&r1, &r2};
+
+    float overlap = INFINITY;
+    vec2f cn;
+    bool wereSwapped = false;
+
+    for (int poly1 = 0; poly1 < 2; poly1++) {
+        auto poly2 = !poly1;
+        
+        auto prev = verticies[poly1]->back();
+        for (auto vert : *verticies[poly1]) {
+            vec2f perp = vert - prev;
+            prev = vert;
+            vec2f axisProj = { -perp.y, perp.x };
+            axisProj = normal(axisProj);
+            auto t = intersectPolygonPolygonUsingAxisHelper(*verticies[poly1], *verticies[poly2], axisProj, poly1);
+            
+            if(!t.continue_calc) {
+                return {vec2f(0.f, 0.f), false};
+            }
+            if(!t.detected) {
+                continue;
+            }
+            if(overlap < t.overlap) {
+                continue;
+            }
+            
+            overlap = t.overlap;
+            cn = t.cn;
+            wereSwapped = poly1;
+        }
+    }
+    if(overlap <= 0.f) {
+        return {vec2f(0.f, 0.f), false};
+    }
+    return {cn, wereSwapped};
+}
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
     const std::vector<vec2f>* verticies[] = {&r1, &r2};
 

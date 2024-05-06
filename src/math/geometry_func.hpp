@@ -113,6 +113,7 @@ struct IntersectionPolygonPolygonResult {
  */
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const ConvexPolygon &r1, const ConvexPolygon &r2);
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2);
+std::pair<vec2f, bool> calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2);
 
 struct IntersectionPolygonCircleResult {
     bool detected;
