@@ -108,7 +108,7 @@ std::vector<PhysicsManager::ColParticipantsWithAxis> PhysicsManager::calcSeparat
     for(auto [idx1, idx2] : col_list) {
         auto [shape1] = *(shapes.begin() + idx1); 
         auto [shape2] = *(shapes.begin() + idx2); 
-        result.push_back({idx1, idx2});
+        result.push_back({idx1, idx2, {}, {}});
         for(const auto& poly1 : shape1) {
             for(const auto& poly2 : shape2) {
                 auto a = calcSeparatingAxisPolygonPolygon(poly1, poly2);
@@ -124,14 +124,23 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
     std::vector<std::vector<CollisionInfo>> result(col_list.size());
     // tp.dispatch(col_list.size(), [&](size_t begin, size_t end) {
         for(size_t i = 0; i < col_list.size(); i++) {
-            auto [idx1, idx2, _, __] = col_list[i];
+            auto [idx1, idx2, axis, isFlipped] = col_list[i];
             auto [shape1] = *(shapes.begin() + idx1);
             auto [shape2] = *(shapes.begin() + idx2);
-            auto col_infos = m_solver->detect(shape1, shape2);
-            result[i] = col_infos;
+            size_t index = 0;
+            result[i].resize(shape1.size() * shape2.size());
+            for(const auto& poly1 : shape1) {
+                for(const auto& poly2 : shape2) {
+                    auto tmp = intersectPolygonPolygonUsingAxis(poly1, poly2, axis[index], isFlipped[index]); 
+                    result[i][index] = {tmp.detected, tmp.contact_normal, tmp.cp, tmp.overlap};
+                    index++;
+                }
+            }
+            // auto col_infos = m_solver->detect(shape1, shape2);
+            // result[i] = col_infos;
         }
     // });
-    tp.waitForCompletion();
+    // tp.waitForCompletion();
     return result;
 }
 void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
@@ -221,7 +230,7 @@ void PhysicsManager::processReactions(float delT,
             }
             
             std::vector<vec2f> cps;
-            if(ticks_passed % 2 == 0) {
+            if(ticks_passed % 4 == 0 || ticks_passed % 4 == 1) {
                 cps = std::vector<vec2f>(info.contact_points.begin(), info.contact_points.end());
             }else {
                 cps = std::vector<vec2f>(info.contact_points.rbegin(), info.contact_points.rend());
@@ -425,6 +434,9 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     auto col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
     
     for (int i = 0; i < steps; i++) {
+        // if(i % 2 == 0) {
+        //     col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
+        // }
         static constexpr float gravity = 1000.f;
         for(auto [vel] : objects.slice<Rigidbody::Velocity>() ){
             vel.y += gravity * deltaStep /* * mass */;
