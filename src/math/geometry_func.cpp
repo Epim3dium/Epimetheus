@@ -684,13 +684,16 @@ IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::
     }
     return {cp_calc_info, true, overlap, cn, true};
 }
-IntersectionPolygonPolygonResult intersectPolygonPolygonUsingAxis(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, const vec2f axisProj) {
-    auto tmp = intersectPolygonPolygonUsingAxisHelper(poly1, poly2, axisProj);
+IntersectionPolygonPolygonResult intersectPolygonPolygonUsingAxis(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, const vec2f axisProj, bool flipAxis) {
+    if(axisProj == vec2f(0, 0)) {
+        return {false};
+    }
+    auto tmp = intersectPolygonPolygonUsingAxisHelper(poly1, poly2, axisProj, flipAxis);
     std::vector<vec2f> collision_points;
     for(auto p : tmp.cp_calc_info) {
         collision_points.push_back(findClosestPointOnEdge(p, poly1));
     }
-    return {tmp.detected && !tmp.continue_calc, axisProj, tmp.overlap, collision_points};
+    return {tmp.detected && tmp.continue_calc, axisProj, tmp.overlap, collision_points};
 }
 std::pair<vec2f, bool> calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
     const std::vector<vec2f>* verticies[] = {&r1, &r2};
