@@ -17,8 +17,7 @@ namespace epi {
 CollisionInfo detectOverlap(const std::vector<vec2f>& p1, const std::vector<vec2f>& p2) {
     auto intersection = intersectPolygonPolygon(p1, p2);
     if(intersection.detected) {
-        auto cps = findContactPoints(p1, p2);
-        return {true, intersection.contact_normal, cps, intersection.overlap};
+        return {true, intersection.contact_normal, intersection.cp, intersection.overlap};
     }
     return {false};
 }
