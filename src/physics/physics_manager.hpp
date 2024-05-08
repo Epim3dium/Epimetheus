@@ -71,7 +71,7 @@ private:
     struct ColParticipantsWithAxis {
         size_t first;
         size_t second;
-        std::vector<vec2f> separatingAxis;
+        std::vector<std::optional<vec2f>> separatingAxis;
         std::vector<bool> isAxisFlipped;
     };
     std::vector<ColParticipantsWithAxis> calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const;
@@ -122,7 +122,7 @@ private:
 
 public :
     // number of physics/collision steps per frame
-    size_t steps = 32U;
+    size_t steps = 8U;
 
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,

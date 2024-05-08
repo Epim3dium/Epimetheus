@@ -103,6 +103,28 @@ PhysicsManager::filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info
     }
     return compatible_collisions;
 }
+vec2f helper_getAxis(const std::vector<vec2f>& points, size_t index) {
+    assert(index < points.size());
+    auto prev = points[index];
+    auto vert = points[(index + 1) % points.size()];
+    vec2f perp = vert - prev;
+    prev = vert;
+    vec2f axisProj = { -perp.y, perp.x };
+    axisProj = normal(axisProj);
+    return axisProj;  
+}
+size_t helper_findIndexOfAxis(const std::vector<vec2f>& points, vec2f separatingAxis) {
+    if(separatingAxis == vec2f(0, 0))
+        return {};
+    for (int i = 0; i < points.size(); i++) {
+        auto axisProj = helper_getAxis(points, i);
+        if(separatingAxis == axisProj) {
+            return i;
+        }
+    }
+    assert(false);
+    return -1;
+}
 std::vector<PhysicsManager::ColParticipantsWithAxis> PhysicsManager::calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
     std::vector<PhysicsManager::ColParticipantsWithAxis> result;
     for(auto [idx1, idx2] : col_list) {
@@ -112,7 +134,12 @@ std::vector<PhysicsManager::ColParticipantsWithAxis> PhysicsManager::calcSeparat
         for(const auto& poly1 : shape1) {
             for(const auto& poly2 : shape2) {
                 auto a = calcSeparatingAxisPolygonPolygon(poly1, poly2);
-                result.back().separatingAxis.push_back(a.first);
+                if(a.first == vec2f(0, 0)) {
+                    result.back().separatingAxis.push_back({});
+                }else {
+                    auto p = helper_findIndexOfAxis(a.second ? poly2 : poly1, a.first);
+                    result.back().separatingAxis.push_back(a.first);
+                }
                 result.back().isAxisFlipped.push_back(a.second);
             }
         }
@@ -124,15 +151,21 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
     std::vector<std::vector<CollisionInfo>> result(col_list.size());
     // tp.dispatch(col_list.size(), [&](size_t begin, size_t end) {
         for(size_t i = 0; i < col_list.size(); i++) {
-            auto [idx1, idx2, axis, isFlipped] = col_list[i];
+            auto [idx1, idx2, axis_indecies, isFlipped] = col_list[i];
             auto [shape1] = *(shapes.begin() + idx1);
             auto [shape2] = *(shapes.begin() + idx2);
             size_t index = 0;
             result[i].resize(shape1.size() * shape2.size());
             for(const auto& poly1 : shape1) {
                 for(const auto& poly2 : shape2) {
-                    auto tmp = intersectPolygonPolygonUsingAxis(poly1, poly2, axis[index], isFlipped[index]); 
-                    result[i][index] = {tmp.detected, tmp.contact_normal, tmp.cp, tmp.overlap};
+                    auto& axis = axis_indecies[index];
+                    bool flip = isFlipped[index];
+                    if(axis.has_value()) {
+                        auto tmp = intersectPolygonPolygonUsingAxis(flip ? poly2 : poly1, flip ? poly1 : poly2, axis.value(), flip); 
+                        result[i][index] = {axis.value() == vec2f(0, 0) ? false : tmp.detected, tmp.contact_normal, tmp.cp, tmp.overlap};
+                    }else {
+                        result[i][index] = {false};
+                    }
                     index++;
                 }
             }
@@ -449,7 +482,6 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
         Collider::updatePartitionedTransformedShapes(
                 objects.sliceOwner<ShapePartitioned, ShapeTransformedPartitioned>(),
                 objects.slice<GlobalTransform>());
-        
         processNarrowPhase(deltaStep, objects, col_axis_list, thread_pool);
     }
     copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
