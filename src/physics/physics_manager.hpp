@@ -71,7 +71,7 @@ private:
     struct ColParticipantsWithAxis {
         size_t first;
         size_t second;
-        std::vector<std::optional<vec2f>> separatingAxis;
+        std::vector<std::optional<size_t>> separatingAxis;
         std::vector<bool> isAxisFlipped;
     };
     std::vector<ColParticipantsWithAxis> calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const;

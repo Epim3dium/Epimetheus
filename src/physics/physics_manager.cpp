@@ -118,7 +118,7 @@ size_t helper_findIndexOfAxis(const std::vector<vec2f>& points, vec2f separating
         return {};
     for (int i = 0; i < points.size(); i++) {
         auto axisProj = helper_getAxis(points, i);
-        if(separatingAxis == axisProj) {
+        if(nearlyEqual(separatingAxis, axisProj, 0.000002f)) {
             return i;
         }
     }
@@ -138,7 +138,7 @@ std::vector<PhysicsManager::ColParticipantsWithAxis> PhysicsManager::calcSeparat
                     result.back().separatingAxis.push_back({});
                 }else {
                     auto p = helper_findIndexOfAxis(a.second ? poly2 : poly1, a.first);
-                    result.back().separatingAxis.push_back(a.first);
+                    result.back().separatingAxis.push_back(p);
                 }
                 result.back().isAxisFlipped.push_back(a.second);
             }
@@ -161,8 +161,9 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
                     auto& axis = axis_indecies[index];
                     bool flip = isFlipped[index];
                     if(axis.has_value()) {
-                        auto tmp = intersectPolygonPolygonUsingAxis(flip ? poly2 : poly1, flip ? poly1 : poly2, axis.value(), flip); 
-                        result[i][index] = {axis.value() == vec2f(0, 0) ? false : tmp.detected, tmp.contact_normal, tmp.cp, tmp.overlap};
+                        auto projAxis = helper_getAxis(flip ? poly2 : poly1, axis.value());
+                        auto tmp = intersectPolygonPolygonUsingAxis(flip ? poly2 : poly1, flip ? poly1 : poly2, projAxis, flip); 
+                        result[i][index] = {tmp.detected, tmp.contact_normal, tmp.cp, tmp.overlap};
                     }else {
                         result[i][index] = {false};
                     }
@@ -467,7 +468,7 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     auto col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
     
     for (int i = 0; i < steps; i++) {
-        // if(i % 2 == 0) {
+        // if(i % 4 == 0) {
         //     col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
         // }
         static constexpr float gravity = 1000.f;
