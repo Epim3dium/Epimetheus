@@ -617,9 +617,14 @@ struct IntersetionPolygonPolygonAxis {
     vec2f cn;
     bool continue_calc  = true;
 };
-IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, vec2f axisProj, bool flipAxis = false) {
-    if(flipAxis)
+IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::vector<vec2f>& p1, const std::vector<vec2f>& p2, vec2f axisProj, bool flipAxis = false) {
+    
+    if(flipAxis) {
         axisProj *= -1.f;
+    }
+    auto& poly1 = flipAxis ? p2 : p1;
+    auto& poly2 = flipAxis ? p1 : p2;
+    
     IntersetionPolygonPolygonAxis result;
     float overlap = INFINITY;
     vec2f cn;
@@ -685,36 +690,34 @@ IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::
     return {cp_calc_info, true, overlap, cn, true};
 }
 IntersectionPolygonPolygonResult intersectPolygonPolygonUsingAxis(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, const vec2f axisProj, bool flipAxis) {
-    if(axisProj == vec2f(0, 0)) {
-        return {false};
-    }
     auto tmp = intersectPolygonPolygonUsingAxisHelper(poly1, poly2, axisProj, flipAxis);
     std::vector<vec2f> collision_points;
     for(auto p : tmp.cp_calc_info) {
-        collision_points.push_back(findClosestPointOnEdge(p, poly1));
+        collision_points.push_back(findClosestPointOnEdge(p, flipAxis ? poly2 : poly1));
     }
-    return {tmp.detected && tmp.continue_calc, axisProj, tmp.overlap, collision_points};
+    return {tmp.detected && tmp.continue_calc, tmp.cn, tmp.overlap, collision_points};
 }
-std::pair<vec2f, bool> calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
+SeparatingAxisInfo calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
     const std::vector<vec2f>* verticies[] = {&r1, &r2};
 
     float overlap = INFINITY;
-    vec2f cn;
-    bool wereSwapped = false;
+    vec2f axis;
+    bool polyUsedInAxisProj = false;
+    size_t index_ret = -1;
 
     for (int poly1 = 0; poly1 < 2; poly1++) {
         auto poly2 = !poly1;
         
-        auto prev = verticies[poly1]->back();
-        for (auto vert : *verticies[poly1]) {
+        for (int i = 0; i < verticies[poly1]->size(); i++) {
+            auto prev = (*verticies[poly1])[i];
+            auto vert = (*verticies[poly1])[(i + 1) % verticies[poly1]->size()];
             vec2f perp = vert - prev;
-            prev = vert;
             vec2f axisProj = { -perp.y, perp.x };
             axisProj = normal(axisProj);
-            auto t = intersectPolygonPolygonUsingAxisHelper(*verticies[poly1], *verticies[poly2], axisProj, poly1);
+            auto t = intersectPolygonPolygonUsingAxisHelper(r1, r2, axisProj, poly1);
             
             if(!t.continue_calc) {
-                return {vec2f(0.f, 0.f), false};
+                return {false};
             }
             if(!t.detected) {
                 continue;
@@ -724,14 +727,16 @@ std::pair<vec2f, bool> calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>
             }
             
             overlap = t.overlap;
-            cn = t.cn;
-            wereSwapped = poly1;
+            axis = axisProj;
+            polyUsedInAxisProj = poly1;
+            index_ret = i; 
         }
     }
     if(overlap <= 0.f) {
-        return {vec2f(0.f, 0.f), false};
+        return {false};
     }
-    return {cn, wereSwapped};
+    assert(index_ret != -1);
+    return {true, axis, polyUsedInAxisProj, index_ret};
 }
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
     const std::vector<vec2f>* verticies[] = {&r1, &r2};
@@ -751,7 +756,7 @@ IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f
             prev = vert;
             vec2f axisProj = { -perp.y, perp.x };
             axisProj = normal(axisProj);
-            auto t = intersectPolygonPolygonUsingAxisHelper(*verticies[poly1], *verticies[poly2], axisProj, poly1);
+            auto t = intersectPolygonPolygonUsingAxisHelper(r1, r2, axisProj, poly1);
             
             if(!t.continue_calc) {
                 return {false};

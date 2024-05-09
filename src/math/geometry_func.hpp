@@ -114,7 +114,13 @@ struct IntersectionPolygonPolygonResult {
 IntersectionPolygonPolygonResult intersectPolygonPolygonUsingAxis(const std::vector<vec2f>& poly1, const std::vector<vec2f>& poly2, const vec2f axisProj, bool flipAxis = false);
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const ConvexPolygon &r1, const ConvexPolygon &r2);
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2);
-std::pair<vec2f, bool> calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2);
+struct SeparatingAxisInfo {
+    bool exists;
+    vec2f axisProj;
+    bool wasItSecondShape;
+    size_t edge_index;
+};
+SeparatingAxisInfo calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2);
 
 struct IntersectionPolygonCircleResult {
     bool detected;
