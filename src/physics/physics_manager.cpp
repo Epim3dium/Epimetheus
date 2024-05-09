@@ -103,44 +103,25 @@ PhysicsManager::filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info
     }
     return compatible_collisions;
 }
-vec2f helper_getAxis(const std::vector<vec2f>& points, size_t index) {
-    assert(index < points.size());
-    auto prev = points[index];
-    auto vert = points[(index + 1) % points.size()];
+vec2f helper_getAxis(const std::vector<vec2f>& points1, const std::vector<vec2f>& points2, size_t index, bool flip) {
+    auto& p = flip ? points2 : points1;
+    assert(index < p.size());
+    auto prev = p[index];
+    auto vert = p[(index + 1) % p.size()];
     vec2f perp = vert - prev;
-    prev = vert;
-    vec2f axisProj = { -perp.y, perp.x };
-    axisProj = normal(axisProj);
-    return axisProj;  
-}
-size_t helper_findIndexOfAxis(const std::vector<vec2f>& points, vec2f separatingAxis) {
-    if(separatingAxis == vec2f(0, 0))
-        return {};
-    for (int i = 0; i < points.size(); i++) {
-        auto axisProj = helper_getAxis(points, i);
-        if(nearlyEqual(separatingAxis, axisProj, 0.000002f)) {
-            return i;
-        }
-    }
-    assert(false);
-    return -1;
+    auto cn = normal({ -perp.y, perp.x });
+    return normal({ -perp.y, perp.x });  
 }
 std::vector<PhysicsManager::ColParticipantsWithAxis> PhysicsManager::calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
     std::vector<PhysicsManager::ColParticipantsWithAxis> result;
     for(auto [idx1, idx2] : col_list) {
         auto [shape1] = *(shapes.begin() + idx1); 
         auto [shape2] = *(shapes.begin() + idx2); 
-        result.push_back({idx1, idx2, {}, {}});
+        result.push_back({idx1, idx2, {}});
         for(const auto& poly1 : shape1) {
             for(const auto& poly2 : shape2) {
                 auto a = calcSeparatingAxisPolygonPolygon(poly1, poly2);
-                if(a.first == vec2f(0, 0)) {
-                    result.back().separatingAxis.push_back({});
-                }else {
-                    auto p = helper_findIndexOfAxis(a.second ? poly2 : poly1, a.first);
-                    result.back().separatingAxis.push_back(p);
-                }
-                result.back().isAxisFlipped.push_back(a.second);
+                result.back().axis.push_back(a);
             }
         }
     }
@@ -151,18 +132,17 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
     std::vector<std::vector<CollisionInfo>> result(col_list.size());
     // tp.dispatch(col_list.size(), [&](size_t begin, size_t end) {
         for(size_t i = 0; i < col_list.size(); i++) {
-            auto [idx1, idx2, axis_indecies, isFlipped] = col_list[i];
+            auto [idx1, idx2, axises] = col_list[i];
             auto [shape1] = *(shapes.begin() + idx1);
             auto [shape2] = *(shapes.begin() + idx2);
             size_t index = 0;
             result[i].resize(shape1.size() * shape2.size());
             for(const auto& poly1 : shape1) {
                 for(const auto& poly2 : shape2) {
-                    auto& axis = axis_indecies[index];
-                    bool flip = isFlipped[index];
-                    if(axis.has_value()) {
-                        auto projAxis = helper_getAxis(flip ? poly2 : poly1, axis.value());
-                        auto tmp = intersectPolygonPolygonUsingAxis(flip ? poly2 : poly1, flip ? poly1 : poly2, projAxis, flip); 
+                    auto& axis = axises[index];
+                    if(axis.exists) {
+                        auto projAxis = helper_getAxis(poly1, poly2, axis.edge_index, axis.wasItSecondShape);
+                        auto tmp = intersectPolygonPolygonUsingAxis(poly1, poly2, projAxis, axis.wasItSecondShape); 
                         result[i][index] = {tmp.detected, tmp.contact_normal, tmp.cp, tmp.overlap};
                     }else {
                         result[i][index] = {false};
@@ -184,7 +164,7 @@ void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
 {
     assert(col_list.size() == col_info.size());
     for(int i = 0; i < col_list.size(); i++) {
-        auto [idx1, idx2, _, __] = col_list[i];
+        auto [idx1, idx2, _] = col_list[i];
         
         float pressure1 = pressure_list[idx1];
         float pressure2 = pressure_list[idx2];
@@ -203,7 +183,7 @@ void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
 }
 std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipantsWithAxis>& col_part) const {
     std::vector<MaterialTuple> selected_properties;
-    for(auto [idx1, idx2, _, __] : col_part) {
+    for(auto [idx1, idx2, _] : col_part) {
         auto [bounce1, sfric1, dfric1] = *(mat_info.begin() + idx1);
         auto [bounce2, sfric2, dfric2] = *(mat_info.begin() + idx2);
         
@@ -228,7 +208,7 @@ void PhysicsManager::processReactions(float delT,
     assert(mat_info.size() == col_info.size());
     assert(col_info.size() == col_list.size());
     for(int i = 0; i < col_list.size(); i++) {
-        auto [idx1, idx2, _, __] = col_list[i];
+        auto [idx1, idx2, _] = col_list[i];
         
         
         auto [bounce, sfric, dfric] = mat_info[i];
@@ -302,7 +282,7 @@ void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, con
             if(!info.detected) {
                 continue;
             }
-            auto [idx1, idx2, _, __] = col_list[i];
+            auto [idx1, idx2, _] = col_list[i];
             pressure_list[idx1] += info.overlap;
             pressure_list[idx2] += info.overlap;
         }
