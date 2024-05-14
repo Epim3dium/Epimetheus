@@ -69,14 +69,14 @@ private:
 
     std::vector<ColParticipants> processBroadPhase(OwnerSlice<ShapeTransformedPartitioned> slice) const;
     std::vector<ColParticipants> filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info, const std::vector<ColParticipants> broad_result) const;
-    std::vector<SeparatingAxisList> calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const;
+    std::vector<SeparatingAxisList> calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list, ThreadPool* tp) const;
     
     struct MaterialTuple {
         float bounce;
         float sfric;
         float dfric;
     };
-    std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<SeparatingAxisList>& axes, const std::vector<ColParticipants>& col_list, ThreadPool& tp) const;
+    std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<SeparatingAxisList>& axes, const std::vector<ColParticipants>& col_list, ThreadPool* tp) const;
     
     void solveOverlaps(Slice<isStaticFlag, Position> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list, std::vector<float>& pressures) const;
     std::vector<MaterialTuple> calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const;
@@ -88,7 +88,7 @@ private:
                       const std::vector<ColParticipants>& col_list) const; 
     void applyReactionReseponses(const std::vector<ReactionResponse>& responses, Slice<Velocity, AngularVelocity> velocities, std::vector<ColParticipants> col_list) const;
     //V
-    void processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool& tp) const;
+    void processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool* tp) const;
     
     void copyResultingVelocities(OwnerSlice<Velocity, AngularVelocity> result_slice, Rigidbody::System& rb_sys) const; 
     void copyResultingTransforms(OwnerSlice<Position, Rotation> result_slice, Transform::System& trans_sys) const; 
@@ -124,7 +124,7 @@ public :
 
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
-                float delT, ThreadPool& thread_pool) const;
+                float delT, ThreadPool* thread_pool = nullptr) const;
 
     // mode used to select bounce when colliding
     eSelectMode bounciness_select = eSelectMode::Min;

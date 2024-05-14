@@ -28,7 +28,7 @@ void calcParitionedShapes(Slice<ShapeModel, ShapePartitioned> shape_slice) {
 }
 void updatePartitionedTransformedShapes(OwnerSlice<ShapePartitioned, ShapeTransformedPartitioned> shape_slice, Slice<Transform::GlobalTransform> transform_slice){
     for(auto [owner, partitioned, trans_part] : shape_slice) {
-        assert(transform_slice.contains(owner)) ;
+        assert(transform_slice.contains(owner));
         const auto& trans = transform_slice.get<Transform::GlobalTransform>(owner);
         
         trans_part = partitioned;

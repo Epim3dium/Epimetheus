@@ -112,23 +112,32 @@ vec2f helper_getAxis(const std::vector<vec2f>& points1, const std::vector<vec2f>
     auto cn = normal({ -perp.y, perp.x });
     return normal({ -perp.y, perp.x });  
 }
-std::vector<PhysicsManager::SeparatingAxisList> PhysicsManager::calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
-    std::vector<PhysicsManager::SeparatingAxisList> result;
-    for(auto [idx1, idx2] : col_list) {
-        auto [shape1] = *(shapes.begin() + idx1); 
-        auto [shape2] = *(shapes.begin() + idx2); 
-        result.push_back({});
-        for(const auto& poly1 : shape1) {
-            for(const auto& poly2 : shape2) {
-                auto a = calcSeparatingAxisPolygonPolygon(poly1, poly2);
-                result.back().push_back(a);
+std::vector<PhysicsManager::SeparatingAxisList>
+PhysicsManager::calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes,
+                                   const std::vector<ColParticipants>& col_list, ThreadPool* tp) const {
+    std::vector<PhysicsManager::SeparatingAxisList> result(col_list.size());
+    auto processRange = [&](int begin, int end) {
+        for(int i = begin; i < end; i++) {
+            auto [idx1, idx2] = col_list[i];
+            auto [shape1] = *(shapes.begin() + idx1); 
+            auto [shape2] = *(shapes.begin() + idx2); 
+            for(const auto& poly1 : shape1) {
+                for(const auto& poly2 : shape2) {
+                    auto a = calcSeparatingAxisPolygonPolygon(poly1, poly2);
+                    result[i].push_back(a);
+                }
             }
         }
+    };
+    if(tp) {
+        tp->dispatch(col_list.size(), processRange);
+        tp->waitForCompletion();
+    }else {
+        processRange(0, col_list.size());
     }
     return result;
-    
 }
-std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<SeparatingAxisList>& axes_list, const std::vector<ColParticipants>& col_list, ThreadPool& tp) const {
+std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<SeparatingAxisList>& axes_list, const std::vector<ColParticipants>& col_list, ThreadPool* tp) const {
     std::vector<std::vector<CollisionInfo>> result(col_list.size());
     // tp.dispatch(col_list.size(), [&](size_t begin, size_t end) {
         for(size_t i = 0; i < col_list.size(); i++) {
@@ -285,7 +294,7 @@ void PhysicsManager::applyReactionReseponses(const std::vector<ReactionResponse>
         angvel2 += r.angvel_change2;
     }
 }
-void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool& tp) const {
+void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool* tp) const {
     auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), axes, col_list, tp);
     std::vector<float> pressure_list(colliding.size(), VERY_SMALL_NUMBER);
     for(int i = 0; i < col_infos.size(); i++) {
@@ -412,7 +421,7 @@ void PhysicsManager::updateGlobalTransform(Slice<GlobalTransform, LocalTransform
 
 void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
             Collider::System& col_sys, Material::System& mat_sys,
-            float delT, ThreadPool& thread_pool) const 
+            float delT, ThreadPool* thread_pool) const 
 {
     float deltaStep = delT / (float)steps;
     auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
@@ -426,11 +435,11 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     
     auto potential_col_list = processBroadPhase(objects.sliceOwner<ShapeTransformedPartitioned>());
     auto col_list = filterBroadPhaseResults(objects.slice<isStaticFlag, Mask, Tag>(), potential_col_list);
-    auto col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
+    auto col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list, thread_pool);
     
     for (int i = 0; i < steps; i++) {
         if(i % 4 == 0) {
-            col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
+            col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list, thread_pool);
         }
         for(auto [vel] : objects.slice<Rigidbody::Velocity>() ){
             vel.y += gravity * deltaStep /* * mass */;
