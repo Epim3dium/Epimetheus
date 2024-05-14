@@ -112,34 +112,35 @@ vec2f helper_getAxis(const std::vector<vec2f>& points1, const std::vector<vec2f>
     auto cn = normal({ -perp.y, perp.x });
     return normal({ -perp.y, perp.x });  
 }
-std::vector<PhysicsManager::ColParticipantsWithAxis> PhysicsManager::calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
-    std::vector<PhysicsManager::ColParticipantsWithAxis> result;
+std::vector<PhysicsManager::SeparatingAxisList> PhysicsManager::calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list) const {
+    std::vector<PhysicsManager::SeparatingAxisList> result;
     for(auto [idx1, idx2] : col_list) {
         auto [shape1] = *(shapes.begin() + idx1); 
         auto [shape2] = *(shapes.begin() + idx2); 
-        result.push_back({idx1, idx2, {}});
+        result.push_back({});
         for(const auto& poly1 : shape1) {
             for(const auto& poly2 : shape2) {
                 auto a = calcSeparatingAxisPolygonPolygon(poly1, poly2);
-                result.back().axis.push_back(a);
+                result.back().push_back(a);
             }
         }
     }
     return result;
     
 }
-std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipantsWithAxis>& col_list, ThreadPool& tp) const {
+std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<SeparatingAxisList>& axes_list, const std::vector<ColParticipants>& col_list, ThreadPool& tp) const {
     std::vector<std::vector<CollisionInfo>> result(col_list.size());
     // tp.dispatch(col_list.size(), [&](size_t begin, size_t end) {
         for(size_t i = 0; i < col_list.size(); i++) {
-            auto [idx1, idx2, axises] = col_list[i];
+            auto [idx1, idx2] = col_list[i];
             auto [shape1] = *(shapes.begin() + idx1);
             auto [shape2] = *(shapes.begin() + idx2);
+            const auto& axises = axes_list[i];
             size_t index = 0;
             result[i].resize(shape1.size() * shape2.size());
             for(const auto& poly1 : shape1) {
                 for(const auto& poly2 : shape2) {
-                    auto& axis = axises[index];
+                    const auto& axis = axises[index];
                     if(axis.exists) {
                         auto projAxis = helper_getAxis(poly1, poly2, axis.edge_index, axis.wasItSecondShape);
                         auto tmp = intersectPolygonPolygonUsingAxis(poly1, poly2, projAxis, axis.wasItSecondShape); 
@@ -159,34 +160,34 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
 }
 void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
                                    const std::vector<std::vector<CollisionInfo>>& col_info,
-                                   const std::vector<ColParticipantsWithAxis>& col_list,
-                                   std::vector<float>& pressure_list) const 
-{
+                                   const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list) const {
     assert(col_list.size() == col_info.size());
-    for(int i = 0; i < col_list.size(); i++) {
-        auto [idx1, idx2, _] = col_list[i];
-        
+    for (int i = 0; i < col_list.size(); i++) {
+        auto [idx1, idx2] = col_list[i];
+
         float pressure1 = pressure_list[idx1];
         float pressure2 = pressure_list[idx2];
         float denom = 2.f / (pressure1 + pressure2);
-        
+
         auto [isStatic1, pos1] = *(shape_info.begin() + idx1);
         auto [isStatic2, pos2] = *(shape_info.begin() + idx2);
         float mult1 = isStatic2 ? 1.f : denom * pressure2;
         float mult2 = isStatic1 ? 1.f : denom * pressure1;
-        for(const auto& info : col_info[i]) {
+        for (const auto& info : col_info[i]) {
             auto [off1, off2] = m_solver->solveOverlap(info, isStatic1, pos1, isStatic2, pos2);
             pos1 += off1;
             pos2 += off2;
         }
     }
 }
-std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipantsWithAxis>& col_part) const {
+std::vector<PhysicsManager::MaterialTuple>
+PhysicsManager::calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info,
+                                     const std::vector<ColParticipants>& col_part) const {
     std::vector<MaterialTuple> selected_properties;
-    for(auto [idx1, idx2, _] : col_part) {
+    for (auto [idx1, idx2] : col_part) {
         auto [bounce1, sfric1, dfric1] = *(mat_info.begin() + idx1);
         auto [bounce2, sfric2, dfric2] = *(mat_info.begin() + idx2);
-        
+
         float restitution = selectFrom<float>(bounce1, bounce2, bounciness_select);
         float sfriction = selectFrom<float>(sfric1, sfric2, friction_select);
         float dfriction = selectFrom<float>(dfric1, dfric2, friction_select);
@@ -200,7 +201,7 @@ std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(
                       AngularVelocity, InertiaDevMass, Position> react_info,
                       const std::vector<MaterialTuple>& mat_info,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
-                      const std::vector<ColParticipantsWithAxis>& col_list) const 
+                      const std::vector<ColParticipants>& col_list) const 
 {
     std::vector<SolverInterface::ReactionResponse> result(col_list.size());
     static int ticks_passed = 0;
@@ -209,7 +210,7 @@ std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(
     assert(mat_info.size() == col_info.size());
     assert(col_info.size() == col_list.size());
     for(int i = 0; i < col_list.size(); i++) {
-        auto [idx1, idx2, _] = col_list[i];
+        auto [idx1, idx2] = col_list[i];
         
         
         auto [bounce, sfric, dfric] = mat_info[i];
@@ -270,10 +271,10 @@ std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(
     }
     return result;
 }
-void PhysicsManager::applyReactionReseponses(const std::vector<ReactionResponse>& responses, Slice<Velocity, AngularVelocity> velocities, std::vector<ColParticipantsWithAxis> col_list) const {
+void PhysicsManager::applyReactionReseponses(const std::vector<ReactionResponse>& responses, Slice<Velocity, AngularVelocity> velocities, std::vector<ColParticipants> col_list) const {
     for(int i = 0; i < responses.size(); i++) {
         const auto& r = responses[i];
-        const auto& [idx1, idx2, _] = col_list[i];
+        const auto& [idx1, idx2] = col_list[i];
         auto [vel1, angvel1] = *(velocities.begin() + idx1);
         auto [vel2, angvel2] = *(velocities.begin() + idx2);
         
@@ -284,15 +285,15 @@ void PhysicsManager::applyReactionReseponses(const std::vector<ReactionResponse>
         angvel2 += r.angvel_change2;
     }
 }
-void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipantsWithAxis>& col_list, ThreadPool& tp) const {
-    auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), col_list, tp);
+void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool& tp) const {
+    auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), axes, col_list, tp);
     std::vector<float> pressure_list(colliding.size(), VERY_SMALL_NUMBER);
     for(int i = 0; i < col_infos.size(); i++) {
         for(auto info : col_infos[i]) {
             if(!info.detected) {
                 continue;
             }
-            auto [idx1, idx2, _] = col_list[i];
+            auto [idx1, idx2] = col_list[i];
             pressure_list[idx1] += info.overlap;
             pressure_list[idx2] += info.overlap;
         }
@@ -474,7 +475,7 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
         Collider::updatePartitionedTransformedShapes(
                 objects.sliceOwner<ShapePartitioned, ShapeTransformedPartitioned>(),
                 objects.slice<GlobalTransform>());
-        processNarrowPhase(deltaStep, objects, col_axis_list, thread_pool);
+        processNarrowPhase(deltaStep, objects, col_list, col_axis_list, thread_pool);
     }
     copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
     copyResultingVelocities(objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
