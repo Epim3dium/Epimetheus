@@ -195,13 +195,14 @@ std::vector<PhysicsManager::MaterialTuple> PhysicsManager::calcSelectedMaterial(
     return selected_properties;
 }
 #define VERY_SMALL_NUMBER (0.01)
-void PhysicsManager::processReactions(float delT, 
+std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(float delT, 
                     Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
                       AngularVelocity, InertiaDevMass, Position> react_info,
                       const std::vector<MaterialTuple>& mat_info,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
                       const std::vector<ColParticipantsWithAxis>& col_list) const 
 {
+    std::vector<SolverInterface::ReactionResponse> result(col_list.size());
     static int ticks_passed = 0;
     ticks_passed++;
     
@@ -242,15 +243,8 @@ void PhysicsManager::processReactions(float delT,
             if(info.overlap < Slop || !info.detected) {
                 continue;
             }
-            
-            std::vector<vec2f> cps;
-            if(ticks_passed % 4 == 0 || ticks_passed % 4 == 1) {
-                cps = std::vector<vec2f>(info.contact_points.begin(), info.contact_points.end());
-            }else {
-                cps = std::vector<vec2f>(info.contact_points.rbegin(), info.contact_points.rend());
-            }
-            
-            for(auto contact_point : cps) {
+            ReactionResponse response;
+            for(auto contact_point : info.contact_points) {
                 auto rad1 = contact_point - pos1;
                 auto rad2 = contact_point - pos2;
                 
@@ -259,19 +253,35 @@ void PhysicsManager::processReactions(float delT,
                         inv_inertia2, mass2, rad2, vel2, angvel2);
                 
                 if(!isStatic1) {
-                    vel1 += reaction.vel_change1;
+                    response.vel_change1 += reaction.vel_change1;
                     if(!lockRot1) {
-                        angvel1 += reaction.angvel_change1;
+                        response.angvel_change1 += reaction.angvel_change1;
                     }
                 }
                 if(!isStatic2) {
-                    vel2 += reaction.vel_change2;
+                    response.vel_change2 += reaction.vel_change2;
                     if(!lockRot2) {
-                        angvel2 += reaction.angvel_change2;
+                        response.angvel_change2 += reaction.angvel_change2;
                     }
                 }
             }
+            result[i] = response;
         }
+    }
+    return result;
+}
+void PhysicsManager::applyReactionReseponses(const std::vector<ReactionResponse>& responses, Slice<Velocity, AngularVelocity> velocities, std::vector<ColParticipantsWithAxis> col_list) const {
+    for(int i = 0; i < responses.size(); i++) {
+        const auto& r = responses[i];
+        const auto& [idx1, idx2, _] = col_list[i];
+        auto [vel1, angvel1] = *(velocities.begin() + idx1);
+        auto [vel2, angvel2] = *(velocities.begin() + idx2);
+        
+        vel1 += r.vel_change1;
+        angvel1 += r.angvel_change1;
+        
+        vel2 += r.vel_change2;
+        angvel2 += r.angvel_change2;
     }
 }
 void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<PhysicsManager::ColParticipantsWithAxis>& col_list, ThreadPool& tp) const {
@@ -290,8 +300,9 @@ void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, con
     solveOverlaps(colliding.slice<isStaticFlag, Position>(), col_infos, col_list, pressure_list);
     
     auto mat_info = calcSelectedMaterial(colliding.slice<Restitution, StaticFric, DynamicFric>(), col_list);
-    processReactions(delT, colliding.slice< isStaticFlag, lockRotationFlag, Mass, Velocity,
+    auto reactions = processReactions(delT, colliding.slice< isStaticFlag, lockRotationFlag, Mass, Velocity,
                           AngularVelocity, InertiaDevMass, Position>(), mat_info, col_infos, col_list);
+    applyReactionReseponses(reactions, colliding.slice<Velocity, AngularVelocity>(), col_list);
 }
 // void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
 //     if(man.collider->isTrigger)
@@ -448,9 +459,9 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     auto col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
     
     for (int i = 0; i < steps; i++) {
-        // if(i % 4 == 0) {
-        //     col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
-        // }
+        if(i % 4 == 0) {
+            col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
+        }
         static constexpr float gravity = 1000.f;
         for(auto [vel] : objects.slice<Rigidbody::Velocity>() ){
             vel.y += gravity * deltaStep /* * mass */;

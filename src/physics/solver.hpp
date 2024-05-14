@@ -24,10 +24,10 @@ public:
     //inv_inertia = 0
     //ang_vel = 0
     struct ReactionResponse {
-        vec2f vel_change1;
-        float angvel_change1;
-        vec2f vel_change2;
-        float angvel_change2;
+        vec2f vel_change1 = {0, 0};
+        float angvel_change1 = 0.f;
+        vec2f vel_change2 = {0, 0};
+        float angvel_change2 = 0.f;
     };
     virtual ReactionResponse processReaction(vec2f contact_normal, float sfric, float dfric, float bounce, 
             float inv_inertia1, float mass1, vec2f rad1, vec2f vel1, float ang_vel1,
