@@ -172,7 +172,7 @@ std::vector<std::vector<CollisionInfo>> PhysicsManager::detectCollisions(Slice<S
 }
 void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
                                    const std::vector<std::vector<CollisionInfo>>& col_info,
-                                   const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list, ThreadPool* tp) const {
+                                   const std::vector<ColParticipants>& col_list, std::vector<float>& pressure_list) const {
     assert(col_list.size() == col_info.size());
     auto processRange = [&](int begin, int end) {
         for (int i = begin; i < end; i++) {
@@ -193,12 +193,7 @@ void PhysicsManager::solveOverlaps(Slice<isStaticFlag, Position> shape_info,
             }
         }
     };
-    if(tp) {
-        tp->dispatch(col_list.size(), processRange);
-        tp->waitForCompletion();
-    }else {
-        processRange(0, col_list.size());
-    }
+    processRange(0, col_list.size());
 }
 std::vector<PhysicsManager::MaterialTuple>
 PhysicsManager::calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info,
@@ -216,17 +211,13 @@ PhysicsManager::calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric>
     return selected_properties;
 }
 #define VERY_SMALL_NUMBER (0.01)
-std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(float delT, 
+void PhysicsManager::processReactions(float delT, 
                     Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
                       AngularVelocity, InertiaDevMass, Position> react_info,
                       const std::vector<MaterialTuple>& mat_info,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
-                      const std::vector<ColParticipants>& col_list, ThreadPool* tp) const 
+                      const std::vector<ColParticipants>& col_list) const 
 {
-    std::vector<SolverInterface::ReactionResponse> result(col_list.size());
-    static int ticks_passed = 0;
-    ticks_passed++;
-    
     assert(mat_info.size() == col_info.size());
     assert(col_info.size() == col_list.size());
     auto processRange = [&](int begin, int end) {
@@ -265,7 +256,6 @@ std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(
                 if(info.overlap < Slop || !info.detected) {
                     continue;
                 }
-                ReactionResponse response;
                 for(auto contact_point : info.contact_points) {
                     auto rad1 = contact_point - pos1;
                     auto rad2 = contact_point - pos2;
@@ -275,43 +265,22 @@ std::vector<SolverInterface::ReactionResponse> PhysicsManager::processReactions(
                             inv_inertia2, mass2, rad2, vel2, angvel2);
                     
                     if(!isStatic1) {
-                        response.vel_change1 += reaction.vel_change1;
+                        vel1 += reaction.vel_change1;
                         if(!lockRot1) {
-                            response.angvel_change1 += reaction.angvel_change1;
+                            angvel1 += reaction.angvel_change1;
                         }
                     }
                     if(!isStatic2) {
-                        response.vel_change2 += reaction.vel_change2;
+                        vel2 += reaction.vel_change2;
                         if(!lockRot2) {
-                            response.angvel_change2 += reaction.angvel_change2;
+                            angvel2 += reaction.angvel_change2;
                         }
                     }
                 }
-                result[i] = response;
             }
         }
     };
-    if(tp) {
-        tp->dispatch(col_list.size(), processRange);
-        tp->waitForCompletion();
-    }else {
-        processRange(0, col_list.size());
-    }
-    return result;
-}
-void PhysicsManager::applyReactionReseponses(const std::vector<ReactionResponse>& responses, Slice<Velocity, AngularVelocity> velocities, std::vector<ColParticipants> col_list) const {
-    for(int i = 0; i < responses.size(); i++) {
-        const auto& r = responses[i];
-        const auto& [idx1, idx2] = col_list[i];
-        auto [vel1, angvel1] = *(velocities.begin() + idx1);
-        auto [vel2, angvel2] = *(velocities.begin() + idx2);
-        
-        vel1 += r.vel_change1;
-        angvel1 += r.angvel_change1;
-        
-        vel2 += r.vel_change2;
-        angvel2 += r.angvel_change2;
-    }
+    processRange(0, col_list.size());
 }
 void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool* tp) const {
     auto col_infos = detectCollisions(colliding.slice<ShapeTransformedPartitioned>(), axes, col_list, tp);
@@ -326,12 +295,11 @@ void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, con
             pressure_list[idx2] += info.overlap;
         }
     }
-    solveOverlaps(colliding.slice<isStaticFlag, Position>(), col_infos, col_list, pressure_list, tp);
+    solveOverlaps(colliding.slice<isStaticFlag, Position>(), col_infos, col_list, pressure_list);
     
     auto mat_info = calcSelectedMaterial(colliding.slice<Restitution, StaticFric, DynamicFric>(), col_list);
-    auto reactions = processReactions(delT, colliding.slice< isStaticFlag, lockRotationFlag, Mass, Velocity,
-                          AngularVelocity, InertiaDevMass, Position>(), mat_info, col_infos, col_list, tp);
-    applyReactionReseponses(reactions, colliding.slice<Velocity, AngularVelocity>(), col_list);
+    processReactions(delT, colliding.slice< isStaticFlag, lockRotationFlag, Mass, Velocity,
+                          AngularVelocity, InertiaDevMass, Position>(), mat_info, col_infos, col_list);
 }
 
 template<class ...GroupTypes, class ...TupleTypes>
@@ -457,7 +425,9 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
     auto col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list, thread_pool);
     
     for (int i = 0; i < steps; i++) {
-        if(i % 3 == 0) {
+        if(i % 4 == 0) {
+            potential_col_list = processBroadPhase(objects.sliceOwner<ShapeTransformedPartitioned>());
+            col_list = filterBroadPhaseResults(objects.slice<isStaticFlag, Mask, Tag>(), potential_col_list);
             col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list, thread_pool);
         }
         for(auto [vel] : objects.slice<Rigidbody::Velocity>() ){

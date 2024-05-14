@@ -78,15 +78,13 @@ private:
     };
     std::vector<std::vector<CollisionInfo>> detectCollisions(Slice<ShapeTransformedPartitioned> shapes, const std::vector<SeparatingAxisList>& axes, const std::vector<ColParticipants>& col_list, ThreadPool* tp) const;
     
-    void solveOverlaps(Slice<isStaticFlag, Position> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list, std::vector<float>& pressures, ThreadPool* tp) const;
+    void solveOverlaps(Slice<isStaticFlag, Position> shape_info, const std::vector<std::vector<CollisionInfo>>& col_info, const std::vector<ColParticipants>& col_list, std::vector<float>& pressures) const;
     std::vector<MaterialTuple> calcSelectedMaterial(Slice<Restitution, StaticFric, DynamicFric> mat_info, const std::vector<ColParticipants>& col_part) const;
-    typedef SolverInterface::ReactionResponse ReactionResponse;
-    std::vector<ReactionResponse> processReactions(float delT, Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
+    void processReactions(float delT, Slice < isStaticFlag, lockRotationFlag, Mass, Velocity,
                       AngularVelocity, InertiaDevMass, Position> react_info,
                       const std::vector<MaterialTuple>& mat_info,
                       const std::vector<std::vector<CollisionInfo>>& col_info,
-                      const std::vector<ColParticipants>& col_list, ThreadPool* tp) const; 
-    void applyReactionReseponses(const std::vector<ReactionResponse>& responses, Slice<Velocity, AngularVelocity> velocities, std::vector<ColParticipants> col_list) const;
+                      const std::vector<ColParticipants>& col_list) const; 
     //V
     void processNarrowPhase(float delT, ColCompGroup& colliding, const std::vector<ColParticipants>& col_list, const std::vector<SeparatingAxisList>& axes, ThreadPool* tp) const;
     
