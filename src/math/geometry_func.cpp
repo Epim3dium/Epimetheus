@@ -646,7 +646,7 @@ IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::
         float q = dot(p, axisProj);
         
         //additional if statements to find if edge is almost parallel to axisProj edge
-        if(nearlyEqual(q, min_r2, 0.01f)) {
+        if(nearlyEqual(q, min_r2, 0.15f)) {
             min_p2.push_back(p);
             min_r2 = (q + min_r2 * (min_p2.size() - 1)) / min_p2.size();
         }else if(q < min_r2) {
@@ -654,7 +654,7 @@ IntersetionPolygonPolygonAxis intersectPolygonPolygonUsingAxisHelper(const std::
             min_p2 = {p};
         }
         
-        if(nearlyEqual(q, max_r2, 0.01f)) {
+        if(nearlyEqual(q, max_r2, 0.15f)) {
             max_p2.push_back(p);
             max_r2 = (q + max_r2 * (max_p2.size() - 1)) / max_p2.size();
         }
@@ -735,7 +735,7 @@ SeparatingAxisInfo calcSeparatingAxisPolygonPolygon(const std::vector<vec2f>&r1,
     if(overlap <= 0.f) {
         return {false};
     }
-    assert(index_ret != -1);
+    assert(index_ret != -1U);
     return {true, axis, polyUsedInAxisProj, index_ret};
 }
 IntersectionPolygonPolygonResult intersectPolygonPolygon(const std::vector<vec2f>&r1, const std::vector<vec2f> &r2) {
