@@ -305,37 +305,6 @@ void PhysicsManager::processNarrowPhase(float delT, ColCompGroup& colliding, con
                           AngularVelocity, InertiaDevMass, Position>(), mat_info, col_infos, col_list);
     applyReactionReseponses(reactions, colliding.slice<Velocity, AngularVelocity>(), col_list);
 }
-// void PhysicsManager::updateRigidObj(RigidManifold& man, float delT) {
-//     if(man.collider->isTrigger)
-//         return;
-//     auto& rb = *man.rigidbody;
-//     //processing dormants
-//     // if(isSleepy && length(rb.velocity) < DORMANT_MIN_VELOCITY && abs(rb.angular_velocity) < DORMANT_MIN_ANGULAR_VELOCITY) {
-//     //     man.collider->time_immobile += delT;
-//     // }else {
-//     //     man.collider->time_immobile = 0.f;
-//     // }
-//
-//     if(isStatic){
-//         rb.velocity = vec2f();
-//         rb.angular_velocity = 0.f;
-//         return;
-//     }
-//     if(rb.lockRotation) {
-//         rb.angular_velocity = 0.f;
-//         rb.angular_force = 0.f;
-//     }
-//
-//     if(!nearlyEqual(qlen(rb.velocity), 0.f))
-//         rb.velocity -= normal(rb.velocity) * std::clamp(qlen(rb.velocity) * man.material->air_drag, 0.f, length(rb.velocity)) * delT;
-//     if(!nearlyEqual(rb.angular_velocity, 0.f))
-//         rb.angular_velocity -= std::copysign(1.f, rb.angular_velocity) * std::clamp(rb.angular_velocity * rb.angular_velocity * man.material->air_drag, 0.f, abs(rb.angular_velocity)) * delT;
-//
-//     rb.velocity += rb.force / rb.mass * delT;
-//     rb.angular_velocity += rb.angular_force / man.collider->getInertia(rb.mass) * delT;
-//     man.transform->setPos(man.transform->getPos() + rb.velocity * delT);
-//     man.transform->setRot(man.transform->getRot() + rb.angular_velocity * delT);
-// }
 
 template<class ...GroupTypes, class ...TupleTypes>
 void updateTypesFromArgs(Entity owner, Group<GroupTypes...> & group, TupleTypes ...tuple){
@@ -463,7 +432,6 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
         if(i % 4 == 0) {
             col_axis_list = calcSeparatingAxis(objects.slice<ShapeTransformedPartitioned>(), col_list);
         }
-        static constexpr float gravity = 1000.f;
         for(auto [vel] : objects.slice<Rigidbody::Velocity>() ){
             vel.y += gravity * deltaStep /* * mass */;
         }

@@ -120,6 +120,7 @@ private:
 public :
     // number of physics/collision steps per frame
     int steps = 8U;
+    float gravity = 1000.f;
 
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
