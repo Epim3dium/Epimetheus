@@ -256,6 +256,7 @@ void PhysicsManager::processReactions(float delT,
                 if(info.overlap < Slop || !info.detected) {
                     continue;
                 }
+                SolverInterface::ReactionResponse response;
                 for(auto contact_point : info.contact_points) {
                     auto rad1 = contact_point - pos1;
                     auto rad2 = contact_point - pos2;
@@ -265,18 +266,22 @@ void PhysicsManager::processReactions(float delT,
                             inv_inertia2, mass2, rad2, vel2, angvel2);
                     
                     if(!isStatic1) {
-                        vel1 += reaction.vel_change1;
-                        if(!lockRot1) {
-                            angvel1 += reaction.angvel_change1;
+                        response.vel_change1 += reaction.vel_change1;
+                        if (!lockRot1) {
+                            response.angvel_change1 += reaction.angvel_change1;
                         }
                     }
-                    if(!isStatic2) {
-                        vel2 += reaction.vel_change2;
-                        if(!lockRot2) {
-                            angvel2 += reaction.angvel_change2;
+                    if (!isStatic2) {
+                        response.vel_change2 += reaction.vel_change2;
+                        if (!lockRot2) {
+                            response.angvel_change2 += reaction.angvel_change2;
                         }
                     }
                 }
+                vel1    += response.vel_change1;
+                angvel1 += response.angvel_change1;
+                vel2    += response.vel_change2;
+                angvel2 += response.angvel_change2;
             }
         }
     };
