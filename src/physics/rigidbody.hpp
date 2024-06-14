@@ -28,6 +28,7 @@ struct System : public Group<isStaticFlag, lockRotationFlag, Force, Velocity, An
         setDefault<isStaticFlag>({true});
         setDefault<lockRotationFlag>({false});
         setDefault<AngularForce>({0.f});
+        setDefault<AngularVelocity>({0.f});
         setDefault<Mass>({1.f});
     }
 };
