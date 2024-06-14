@@ -63,10 +63,16 @@ private:
     }
     typedef std::pair<size_t, size_t> ColParticipants;
     typedef std::vector<SeparatingAxisInfo> SeparatingAxisList;
+    struct MultiThreadingNecessary {
+        ColCompGroup objects;
+        std::thread thread;
+        ThreadPool* threadPool = nullptr;
+    };
 
     std::shared_ptr<SolverInterface> m_solver =
         std::make_shared<DefaultSolver>();
-
+    MultiThreadingNecessary m_parallel;
+    
     std::vector<ColParticipants> processBroadPhase(OwnerSlice<ShapeTransformedPartitioned> slice) const;
     std::vector<ColParticipants> filterBroadPhaseResults(Slice<isStaticFlag, Mask, Tag> comp_info, const std::vector<ColParticipants> broad_result) const;
     std::vector<SeparatingAxisList> calcSeparatingAxis(Slice<ShapeTransformedPartitioned> shapes, const std::vector<ColParticipants>& col_list, ThreadPool* tp) const;
@@ -115,6 +121,9 @@ private:
     void rollbackGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const;
     void updateGlobalTransform(Slice<GlobalTransform, LocalTransform> slice) const;
 
+    void m_update(ColCompGroup& global_group,
+                float delT, ThreadPool* thread_pool = nullptr) const;
+    
 public :
     // number of physics/collision steps per frame
     int steps = 8U;
@@ -122,7 +131,8 @@ public :
 
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
-                float delT, ThreadPool* thread_pool = nullptr) const;
+                float delT);
+    void sync(Transform::System& trans_sys, Rigidbody::System& rb_sys);
 
     // mode used to select bounce when colliding
     eSelectMode bounciness_select = eSelectMode::Min;
@@ -134,7 +144,9 @@ public :
         m_solver = std::make_unique<T>();
     }
     // size should be max simulated size
-    PhysicsManager() {}
+    PhysicsManager(ThreadPool* tp = nullptr) {
+        m_parallel.threadPool = tp;
+    }
     ~PhysicsManager() {}
 };
 } // namespace epi

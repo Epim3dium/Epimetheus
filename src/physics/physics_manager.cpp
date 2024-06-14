@@ -411,12 +411,10 @@ void PhysicsManager::updateGlobalTransform(Slice<GlobalTransform, LocalTransform
         g.combine(l);
 }
 
-void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
-            Collider::System& col_sys, Material::System& mat_sys,
-            float delT, ThreadPool* thread_pool) const 
-{
+void PhysicsManager::m_update(ColCompGroup& objects,
+            float delT, ThreadPool* thread_pool) const {
     float deltaStep = delT / (float)steps;
-    auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
+    // auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
     
     
     Collider::calcParitionedShapes(objects.slice<ShapeModel, ShapePartitioned>());
@@ -448,9 +446,30 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
                 objects.slice<GlobalTransform>());
         processNarrowPhase(deltaStep, objects, col_list, col_axis_list, thread_pool);
     }
-    copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
-    copyResultingVelocities(objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
     // processSleeping();
+}
+void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
+            Collider::System& col_sys, Material::System& mat_sys,
+            float delT) 
+{
+    if(m_parallel.threadPool == nullptr) {
+        auto objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
+        m_update(objects, delT);
+        copyResultingVelocities(objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
+        copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
+    }else {
+        m_parallel.objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
+        m_parallel.thread = std::thread([&]() {
+            m_update(m_parallel.objects, delT);
+        });
+    }
+}
+void epi::PhysicsManager::sync(Transform::System& trans_sys, Rigidbody::System& rb_sys) {
+    if(m_parallel.thread.joinable()) {
+        m_parallel.thread.join();
+        copyResultingTransforms(m_parallel.objects.sliceOwner<Position, Rotation>(), trans_sys);
+        copyResultingVelocities(m_parallel.objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
+    }
 }
 
 } // namespace epi
