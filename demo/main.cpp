@@ -1,4 +1,6 @@
 #include "app.hpp"
+#include <thread>
+#include <chrono>
 
 using namespace epi;
 
@@ -33,6 +35,7 @@ void updateParentTransformByHierarchy(
         global_trans.combine(my_trans);
     }
 }
+ThreadPool tp;
 
 struct System {
     Transform::System transform_sys;
@@ -42,6 +45,8 @@ struct System {
     Material::System material_sys;
     PhysicsManager phy_man;
     Entity world = Entity("world");
+    
+    
     std::unordered_map<Entity, sf::Color> color_table;
     void add(Entity id, Transform::Position pos, Transform::Rotation r, Hierarchy::Parent parent,
              sf::Color color, std::vector<vec2f> model) {
@@ -71,7 +76,7 @@ struct System {
         material_sys.push_back(id);
         collider_sys.push_back(id, points);
     }
-    System() {
+    System() : phy_man(&tp){
         hierarchy_sys.setDefault(Hierarchy::Parent(world));
         transform_sys.setDefault<Transform::LocalTransform>(Transform::LocalTransform::Identity);
         transform_sys.setDefault(Transform::Scale(vec2f(1.f, 1.f)));
@@ -350,12 +355,14 @@ public:
     
     std::vector<SaveData> saves;
     SaveData latest_save;
-    const double save_interval = 0.125f;
+    const double save_interval = 0.5f;
     double current_time;
     
     std::vector<vec2f> creation_points;
+    
+    int FPS_Limit = 1000000;
     bool setup() override {
-        setConstantFramerate(60);
+        // setConstantFramerate(60);
         sys.add(yellow,  Parent{sys.world}, sf::Color::Yellow,  {big_aabb.bl(), big_aabb.br(), small_aabb.br(), small_aabb.bl()}, true);
         sys.add(magenta, Parent{sys.world}, sf::Color::Magenta, {big_aabb.tl(), big_aabb.tr(), small_aabb.tr(), small_aabb.tl()}, true);
         sys.add(red,     Parent{sys.world}, sf::Color::Red,     {big_aabb.bl(), big_aabb.tl(), small_aabb.tl(), small_aabb.bl()}, true);
@@ -363,7 +370,7 @@ public:
         // sys.add(Entity(), "", Position({100.f, 100.f}), Rotation(0.f), sys.world, sf::Color::White, model_rect);
         hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy_sys.sliceOwner<Parent>());
         
-        saves.push_back({0.0, sys});
+        // saves.push_back({0.0, sys});
         
         ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
 
@@ -423,40 +430,38 @@ public:
         addHook(sf::Event::KeyReleased, 
             [&](sf::Event event, const sf::Window& window) {
                 if(event.key.code == sf::Keyboard::Dash) {
-                    sys = latest_save.world_state;
+                    // sys = latest_save.world_state;
                 }
             });
         return true;
     }
     void update(sf::Time deltaTime) override final {
-        float fixedDeltaTime = 1.f / 60.f;
         // float fixedDeltaTime = delTtime.asSeconds();
         
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Dash)) {
-            current_time -= fixedDeltaTime * 2.f; 
-            while(current_time < saves.back().time_stamp) {
-                latest_save = saves.back();
-                sys = latest_save.world_state;
-                saves.pop_back();
-                EPI_LOG_DEBUG << "reloaded new save_state";
-            }
-            float lerp_time = std::clamp<float>(1.f - (latest_save.time_stamp - current_time) / save_interval, 0.f, 1.f);
-            
-            sys = latest_save.world_state;
-            lerp(lerp_time, sys, saves.back().world_state);
-            hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy_sys.sliceOwner<Parent>());
-        }else {
-            latest_save.world_state = sys;
-            latest_save.time_stamp = current_time;
-        }
-        if(current_time - save_interval > saves.back().time_stamp) {
-            EPI_LOG_DEBUG << "saved!";
-            saves.push_back({current_time, sys});
-        }
-        current_time += fixedDeltaTime;
+        // if(sf::Keyboard::isKeyPressed(sf::Keyboard::Dash)) {
+        //     current_time -= deltaTime.asSeconds() * 2.f; 
+        //     while(current_time < saves.back().time_stamp) {
+        //         latest_save = saves.back();
+        //         sys = latest_save.world_state;
+        //         saves.pop_back();
+        //         EPI_LOG_DEBUG << "reloaded new save_state";
+        //     }
+        //     float lerp_time = std::clamp<float>(1.f - (latest_save.time_stamp - current_time) / save_interval, 0.f, 1.f);
+        //     
+        //     sys = latest_save.world_state;
+        //     lerp(lerp_time, sys, saves.back().world_state);
+        //     hierarchy_bfs = Hierarchy::getBFSIndexList(sys.hierarchy_sys.sliceOwner<Parent>());
+        // }else {
+        //     latest_save.world_state = sys;
+        //     latest_save.time_stamp = current_time;
+        // }
+        // if(current_time - save_interval > saves.back().time_stamp) {
+        //     EPI_LOG_DEBUG << "saved!";
+        //     saves.push_back({current_time, sys});
+        // }
+        // current_time += deltaTime.asSeconds();
 
         // clear the window with black color
-        
         Transform::updateLocalTransforms(sys.transform_sys.slice<Position, Rotation, Scale, LocalTransform>());
         
         updateParentTransformByHierarchy(
@@ -464,20 +469,23 @@ public:
             sys.hierarchy_sys, hierarchy_bfs);
 
         
-        static ThreadPool tp;
-        sys.phy_man.update(sys.transform_sys, sys.rigidbody_sys, sys.collider_sys, sys.material_sys, fixedDeltaTime /* delTtime.asSeconds() */, tp);
+        sys.phy_man.sync(sys.transform_sys, sys.rigidbody_sys);
+        sys.phy_man.update(sys.transform_sys, sys.rigidbody_sys, sys.collider_sys, sys.material_sys, deltaTime.asSeconds());
         
         {
             ImGui::Begin("settings");
-            ImGui::Text("ObjectCount: %zu", sys.transform_sys.size());
+            // ImGui::Text("ObjectCount: %zu", sys.transform_sys.size());
             static constexpr size_t sample_size = 300U;
             static size_t cur_fps_idx = 0;
             static std::vector<double> FPS(sample_size);
             FPS[(cur_fps_idx++) % sample_size] = 1.0 / deltaTime.asSeconds();
             auto avg_fps = std::reduce(FPS.begin(), FPS.end()) / static_cast<double>(FPS.size());
-            
-            ImGui::Text("FPS: %f", avg_fps);
-            
+
+            ImGui::Text("FPS: %f, (delta time: %d ms)", avg_fps, deltaTime.asMilliseconds());
+            ImGui::SliderInt("limit FPS", &FPS_Limit, 1, 1000);
+
+            // ImGui::SliderInt("step count", &sys.phy_man.steps, 1, 64);
+
             ImGui::Dummy({});
             for (auto [e] : sys.hierarchy_sys.sliceOwner<>()) {
                 ImGui::SameLine();
@@ -490,7 +498,7 @@ public:
             for(auto idx : DFSpath) {
                 auto [e] = *(sys.hierarchy_sys.sliceOwner<>().begin() + idx);
             }
-            
+
             for (auto [e] : sys.hierarchy_sys.sliceOwner<>()) {
                 if (selection.id != e) {
                     // if(sys.rb_sys.try_get<Rigidbody::isStaticFlag>(e).has_value())
@@ -500,7 +508,7 @@ public:
                 ImGui::BeginChild("tab");
                 
                 ImGui::Text("%s", "settings");
-            
+
                 auto& scale = sys.transform_sys.get<Transform::Scale>(selection.id);
                 ImGui::DragFloat2("scale", (float*)&scale, 0.05f);
                 
@@ -529,6 +537,7 @@ public:
         }
     }
     virtual void render(sf::RenderWindow& window) override final {
+        window.setFramerateLimit(FPS_Limit);
         std::vector<sf::Vector2f> positions;
         std::vector<Entity> ids;
         for (auto [e, global_trans] : sys.transform_sys.sliceOwner<GlobalTransform>()) {
