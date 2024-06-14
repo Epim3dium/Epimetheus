@@ -69,15 +69,35 @@ public:
     CompTy& get(Entity entity) {
         return *try_get<CompTy>(entity).value();
     }
+    template<class CompTy>
+    std::optional<const CompTy *> try_cget(Entity entity) const {
+        static_assert(is_present<CompTy, Types...>::value);
+        auto index_found = getIndex(entity);
+        if(!index_found.has_value()) {
+            return {};
+        }
+        size_t index = index_found.value();
+        return &std::get<std::span<CompTy>>(m_data_spans)[index];
+    }
+    template<class CompTy>
+    const CompTy& cget(Entity entity) const {
+        return *try_cget<CompTy>(entity).value();
+    }
     iterator begin() {
         return std::apply([&](auto&... spans) {
                 return iterator(spans.data()...);
             }, m_data_spans); 
     }
+    const_iterator begin() const {
+        return cbegin(); 
+    }
     iterator end() {
         return std::apply([&](auto&... spans) {
                 return iterator(spans.data() + spans.size()...);
             }, m_data_spans); 
+    }
+    const_iterator end() const {
+        return cend();
     }
     const_iterator cbegin() const {
         return std::apply([&](auto&... spans) {

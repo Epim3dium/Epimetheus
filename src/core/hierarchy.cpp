@@ -4,7 +4,7 @@
 namespace epi {
 namespace Hierarchy {
     
-std::vector<size_t> getDFSIndexList(OwnerSlice<Parent, Children> slice) {
+std::vector<size_t> getDFSIndexList(const OwnerSlice<Parent, Children> slice) {
     std::vector<size_t> path;
     int max_depth = -1;
     Entity first = Entity::invalid();
@@ -25,7 +25,7 @@ std::vector<size_t> getDFSIndexList(OwnerSlice<Parent, Children> slice) {
         size_t index = slice.getIndex(current_entity).value();
         open.pop();
         path.push_back(index);
-        for(auto c : slice.get<Hierarchy::Children>(current_entity)) {
+        for(auto c : slice.cget<Hierarchy::Children>(current_entity)) {
             open.push(c);
         }
     }
