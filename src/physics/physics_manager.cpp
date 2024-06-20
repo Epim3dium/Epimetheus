@@ -459,17 +459,24 @@ void PhysicsManager::update(Transform::System& trans_sys, Rigidbody::System& rb_
         copyResultingTransforms(objects.sliceOwner<Position, Rotation>(), trans_sys);
     }else {
         m_parallel.objects = createCollidingObjectsGroup(trans_sys, rb_sys, col_sys, mat_sys);
-        m_parallel.thread = std::thread([&]() {
+        m_parallel.thread = new std::thread([&]() {
             m_update(m_parallel.objects, delT);
         });
     }
 }
-void epi::PhysicsManager::sync(Transform::System& trans_sys, Rigidbody::System& rb_sys) {
-    if(m_parallel.thread.joinable()) {
-        m_parallel.thread.join();
+bool epi::PhysicsManager::sync(Transform::System& trans_sys, Rigidbody::System& rb_sys) {
+    if(m_parallel.threadPool == nullptr || m_parallel.thread == nullptr)
+        return true;
+    std::cerr << "triedSyncing\n";
+    if(m_parallel.thread->joinable()) {
+        m_parallel.thread->join();
+        std::cerr << "Synced\n";
+        delete m_parallel.thread;
         copyResultingTransforms(m_parallel.objects.sliceOwner<Position, Rotation>(), trans_sys);
         copyResultingVelocities(m_parallel.objects.sliceOwner<Velocity, AngularVelocity>(), rb_sys);
+        return true;
     }
+    return false;
 }
 
 } // namespace epi

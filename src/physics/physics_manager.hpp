@@ -65,7 +65,7 @@ private:
     typedef std::vector<SeparatingAxisInfo> SeparatingAxisList;
     struct MultiThreadingNecessary {
         ColCompGroup objects;
-        std::thread thread;
+        std::thread* thread = nullptr;
         ThreadPool* threadPool = nullptr;
     };
 
@@ -132,7 +132,7 @@ public :
     void update(Transform::System& trans_sys, Rigidbody::System& rb_sys,
                 Collider::System& col_sys, Material::System& mat_sys,
                 float delT);
-    void sync(Transform::System& trans_sys, Rigidbody::System& rb_sys);
+    bool sync(Transform::System& trans_sys, Rigidbody::System& rb_sys);
 
     // mode used to select bounce when colliding
     eSelectMode bounciness_select = eSelectMode::Min;

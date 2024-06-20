@@ -469,8 +469,9 @@ public:
             sys.hierarchy_sys, hierarchy_bfs);
 
         
-        sys.phy_man.sync(sys.transform_sys, sys.rigidbody_sys);
-        sys.phy_man.update(sys.transform_sys, sys.rigidbody_sys, sys.collider_sys, sys.material_sys, deltaTime.asSeconds());
+        if(sys.phy_man.sync(sys.transform_sys, sys.rigidbody_sys)) {
+            sys.phy_man.update(sys.transform_sys, sys.rigidbody_sys, sys.collider_sys, sys.material_sys, deltaTime.asSeconds());
+        }
         
         {
             ImGui::Begin("settings");
